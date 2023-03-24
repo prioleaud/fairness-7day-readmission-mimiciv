@@ -30,7 +30,7 @@ from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.calibration import CalibratedClassifierCV
 
 # import metrics
-from sklearn.metrics import roc_auc_score, average_precision_score
+from sklearn.metrics import roc_auc_score, average_precision_score,confusion_matrix
 from utils.metrics import Youden_J_thresh, F_score_thresh,output_results
 
 # import plots
@@ -2347,11 +2347,72 @@ plt.savefig(filename)
 
 #%%
 '''
-Apply Prejudice Remover to training daa with Hispanic/Latino as privileged group and Black/African American
-and White as unprivileged group
+Apply Prejudice Remover to training daa with Hispanic/Latino as unprivileged group and Black/African American
+and White as privileged group
 '''
 from aif360.algorithms.inprocessing import PrejudiceRemover
 
+#%%
+
+keep_cols = keep_features + ['label','ethnicity']
+
+
+convert_train_to_num_df = train_scaled[keep_cols]
+convert_train_to_num_df['hipsanic_vs_all'] = [0 if ethnicity == 'HISPANIC/LATINO' else 1 for ethnicity in train_scaled.ethnicity] 
+convert_train_to_num_df = convert_train_to_num_df.drop(columns=['ethnicity'])
+
+
+binaryLabelDataset_train = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_train_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['hipsanic_vs_all'])
+
+convert_valid_to_num_df = valid_scaled[keep_cols]
+convert_valid_to_num_df['hipsanic_vs_all'] = [0 if ethnicity == 'HISPANIC/LATINO' else 1 for ethnicity in valid_scaled.ethnicity] 
+convert_valid_to_num_df = convert_valid_to_num_df.drop(columns=['ethnicity'])
+
+
+binaryLabelDataset_valid = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_valid_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['hipsanic_vs_all'])
+
+sens_attr = binaryLabelDataset_train.protected_attribute_names[0]
+
+# evaluate the model
+
+aucs = []
+tprs = []
+fprs = []
+eta_value = [0.01,1.0,5.0,10.0,15.0,20.0,50.0] # Parameter for Prejudice Remover
+y_valid = valid_scaled['label']
+for eta in eta_value:
+    model = PrejudiceRemover(sensitive_attr=sens_attr, eta=eta)
+    model = model.fit(binaryLabelDataset_train)
+    y_pred = model.predict(binaryLabelDataset_valid).scores[:, 0]
+    aucs.append(roc_auc_score(y_valid, y_pred))
+        
+# AUC by eta 
+plt.figure()
+plt.plot(eta_value,aucs)
+plt.ylim([0,1])
+plt.xlabel('eta value (Prejudice Remover parameter)')
+plt.ylabel('AUROC')
+
+#%%
+best_eta = 10
+model = PrejudiceRemover(sensitive_attr=sens_attr, eta=best_eta)
+model = model.fit(binaryLabelDataset_train)
+y_pred = model.predict(binaryLabelDataset_valid).scores[:, 0]
+  
+J_optimal_thresh = Youden_J_stat(y_valid, y_pred)  
+F_optimal_thresh = F_score_thresh(y_valid, y_pred)
+
+#%%
 keep_cols = keep_features + ['label','ethnicity']
 
 
@@ -2367,12 +2428,9 @@ binaryLabelDataset = BinaryLabelDataset(
     label_names=['label'],
     protected_attribute_names=['hipsanic_vs_all'])
 
-sens_attr = binaryLabelDataset.protected_attribute_names[0]
-model = PrejudiceRemover(sensitive_attr=sens_attr, eta=25.0)
 
 binaryLabelDataset.features = binaryLabelDataset.features[:,:104]
 binaryLabelDataset.feature_names = binaryLabelDataset.feature_names[:104]
-model = model.fit(binaryLabelDataset)
 
 # convert test data to BinaryLabelDataset
 convert_test_to_num_df = test_scaled[keep_cols]
@@ -2389,10 +2447,15 @@ binaryLabelDataset_Xtest = BinaryLabelDataset(
 binaryLabelDataset_Xtest.features = binaryLabelDataset_Xtest.features[:,:104]
 binaryLabelDataset_Xtest.feature_names = binaryLabelDataset_Xtest.feature_names[:104]
 
+sens_attr = binaryLabelDataset.protected_attribute_names[0]
+
+
+model = PrejudiceRemover(sensitive_attr=sens_attr, eta=best_eta)
+model = model.fit(binaryLabelDataset)
+
 # predict outcomes for test set 
 y_pred = model.predict(binaryLabelDataset_Xtest).scores[:, 0]
 
-# evaluate the model
 # AUC
 auc = roc_auc_score(y_test, y_pred)
 plot_roc_curve(y_test, y_pred,'Prejudice Remover',
@@ -2545,3 +2608,1807 @@ plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
                              plot_title='Calibration Plot - Prejudice Remover',
                              filename='../results/preliminary_prejudiceremover_hispanic/calibration_plot_ethnicity_gender_age.png')
 
+#%%
+
+'''
+Apply Prejudice Remover to training daa with Black/African American as unprivileged group and Hispanic/Latino
+and White as privileged group
+'''
+
+keep_cols = keep_features + ['label','ethnicity']
+
+
+convert_train_to_num_df = train_scaled[keep_cols]
+convert_train_to_num_df['black_vs_all'] = [0 if ethnicity == 'BLACK/AFRICAN AMERICAN' else 1 for ethnicity in train_scaled.ethnicity] 
+convert_train_to_num_df = convert_train_to_num_df.drop(columns=['ethnicity'])
+
+
+binaryLabelDataset_train = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_train_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['black_vs_all'])
+
+convert_valid_to_num_df = valid_scaled[keep_cols]
+convert_valid_to_num_df['black_vs_all'] = [0 if ethnicity == 'BLACK/AFRICAN AMERICAN' else 1 for ethnicity in valid_scaled.ethnicity] 
+convert_valid_to_num_df = convert_valid_to_num_df.drop(columns=['ethnicity'])
+
+
+binaryLabelDataset_valid = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_valid_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['black_vs_all'])
+
+sens_attr = binaryLabelDataset_train.protected_attribute_names[0]
+
+# evaluate the model
+
+aucs = []
+tprs = []
+fprs = []
+eta_value = [0.01,1.0,5.0,10.0,15.0,20.0,50.0] # Parameter for Prejudice Remover
+y_valid = valid_scaled['label']
+for eta in eta_value:
+    model = PrejudiceRemover(sensitive_attr=sens_attr, eta=eta)
+    model = model.fit(binaryLabelDataset_train)
+    y_pred = model.predict(binaryLabelDataset_valid).scores[:, 0]
+    aucs.append(roc_auc_score(y_valid, y_pred))
+        
+# AUC by eta 
+plt.figure()
+plt.plot(eta_value,aucs)
+plt.ylim([0,1])
+plt.xlabel('eta value (Prejudice Remover parameter)')
+plt.ylabel('AUROC')
+
+#%%
+best_eta = 0.01
+model = PrejudiceRemover(sensitive_attr=sens_attr, eta=best_eta)
+model = model.fit(binaryLabelDataset_train)
+y_pred = model.predict(binaryLabelDataset_valid).scores[:, 0]
+  
+J_optimal_thresh = Youden_J_stat(y_valid, y_pred)  
+F_optimal_thresh = F_score_thresh(y_valid, y_pred)
+#%%
+
+
+convert_train_to_num_df = full_train_scaled[keep_cols]
+convert_train_to_num_df['black_vs_all'] = [0 if ethnicity == 'BLACK/AFRICAN AMERICAN' else 1 for ethnicity in full_train_scaled.ethnicity] 
+convert_train_to_num_df = convert_train_to_num_df.drop(columns=['ethnicity'])
+
+
+binaryLabelDataset = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_train_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['black_vs_all'])
+
+sens_attr = binaryLabelDataset.protected_attribute_names[0]
+
+binaryLabelDataset.features = binaryLabelDataset.features[:,:104]
+binaryLabelDataset.feature_names = binaryLabelDataset.feature_names[:104]
+
+# convert test data to BinaryLabelDataset
+convert_test_to_num_df = test_scaled[keep_cols]
+convert_test_to_num_df['black_vs_all'] = [0 if ethnicity == 'BLACK/AFRICAN AMERICAN' else 1 for ethnicity in test_scaled.ethnicity] 
+convert_test_to_num_df = convert_test_to_num_df.drop(columns=['ethnicity'])
+
+binaryLabelDataset_Xtest = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_test_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['black_vs_all'])
+
+binaryLabelDataset_Xtest.features = binaryLabelDataset_Xtest.features[:,:104]
+binaryLabelDataset_Xtest.feature_names = binaryLabelDataset_Xtest.feature_names[:104]
+
+
+model = PrejudiceRemover(sensitive_attr=sens_attr, eta=best_eta)
+model = model.fit(binaryLabelDataset)
+
+# predict outcomes for test set 
+y_pred = model.predict(binaryLabelDataset_Xtest).scores[:, 0]
+
+# evaluate the model
+# AUC
+auc = roc_auc_score(y_test, y_pred)
+plot_roc_curve(y_test, y_pred,'Prejudice Remover',
+               'Receiver operating characteristic curve: test set',
+               '../results/preliminary_prejudiceremover_black/roc_curve.png')
+
+# Average Precision
+ap = average_precision_score(y_test, y_pred,average='samples')
+plot_pr_curve(y_test,y_pred,'Prejudice Remover',
+               'Precision-recall curve: test set',
+               '../results/preliminary_prejudiceremover_black/precision_recall_curve.png')
+
+#Calibration Curve
+plot_calibration_curve(y_test,y_pred,10,'Prejudice Remover',
+                       'Calibration Plot: test set',
+                       '../results/preliminary_prejudiceremover_black/calibration_curve.png')
+
+results = []
+results.append(['J thresh - validation set'] + output_results(y_test,y_pred,J_optimal_thresh))
+results.append(['F thresh - validation set'] + output_results(y_test,y_pred,F_optimal_thresh))
+
+J_optimal_thresh_test = Youden_J_stat(y_test, y_pred)
+
+F_optimal_thresh_test = F_score_thresh(y_test, y_pred)
+
+results.append(['J thresh - test set'] + output_results(y_test,y_pred,J_optimal_thresh_test))
+results.append(['F thresh - test set'] + output_results(y_test,y_pred,F_optimal_thresh_test))
+
+
+results_df = pd.DataFrame(results)
+results_df.to_excel('../results/preliminary_prejudiceremover_black/overall_model_results.xlsx',
+                  header=['Threshold Type','AUC','AP','ECE','MCE','HLH','HLH_pval','prob_thresh','Precision','Recall','FPR','Balanced Accuracy'])
+
+
+
+subgrp_results = []
+test_results_df = pd.concat([test_scaled,pd.DataFrame(y_pred,columns=['pred_proba'])],axis=1)
+thresh = F_optimal_thresh_test
+
+ethnic_groups = test_results_df.ethnicity.unique()
+    
+for grp in ethnic_groups:
+    sub_df = test_results_df[test_results_df.ethnicity == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+gender_groups = test_results_df.gender.unique()
+
+for grp in gender_groups:
+    sub_df = test_results_df[test_results_df.gender == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+age_groups = test_results_df.age_binned.unique()
+
+for grp in age_groups:
+    sub_df = test_results_df[test_results_df.age_binned == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+groups = test_results_df.groupby(['ethnicity','gender'])
+
+for name, subgroup in groups:
+     
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['ethnicity','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['gender','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['ethnicity','gender','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+    
+subgrp_results_df = pd.DataFrame(subgrp_results,
+                                 columns=['Subgroup','AUC','AP','ECE','MCE','HLH','HLH_pval','prob_thresh','Precision','Recall','FPR','Balanced Accuracy'])
+subgrp_results_df.to_excel('../results/preliminary_prejudiceremover_black/subgroup_results.xlsx')
+
+
+# plot calibration curve by ethnicity
+col = 'ethnicity'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_black/calibration_plot_ethnicity.png')
+
+
+# plot calibration curve by gender
+col = 'gender'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_black/calibration_plot_gender.png')
+
+# plot calibration curve by ethnicity
+col = 'age_binned'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_black/calibration_plot_age.png')
+
+
+# plot calibration curve by ethnicity and gender
+col = ['ethnicity','gender']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_black/calibration_plot_ethnicity_gender.png')
+
+
+# plot calibration curve by ethnicity and age
+col = ['ethnicity','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_black/calibration_plot_ethnicity_age.png')
+
+# plot calibration curve by gender and age
+col = ['gender','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_black/calibration_plot_gender_age.png')
+
+# plot calibration curve by ethnicity, gender and age
+col = ['ethnicity','gender','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_black/calibration_plot_ethnicity_gender_age.png')
+
+#%%
+'''
+Apply Prejudice Remover to training daa with White as unprivileged group and Hispanic/Latino
+and Black/African American as privileged group
+'''
+keep_cols = keep_features + ['label','ethnicity']
+
+
+convert_train_to_num_df = train_scaled[keep_cols]
+convert_train_to_num_df['white_vs_all'] = [0 if ethnicity == 'WHITE' else 1 for ethnicity in train_scaled.ethnicity] 
+convert_train_to_num_df = convert_train_to_num_df.drop(columns=['ethnicity'])
+
+
+binaryLabelDataset_train = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_train_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['white_vs_all'])
+
+convert_valid_to_num_df = valid_scaled[keep_cols]
+convert_valid_to_num_df['white_vs_all'] = [0 if ethnicity == 'WHITE' else 1 for ethnicity in valid_scaled.ethnicity] 
+convert_valid_to_num_df = convert_valid_to_num_df.drop(columns=['ethnicity'])
+
+
+binaryLabelDataset_valid = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_valid_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['white_vs_all'])
+
+sens_attr = binaryLabelDataset_train.protected_attribute_names[0]
+
+# evaluate the model
+
+aucs = []
+tprs = []
+fprs = []
+eta_value = [0.01,1.0,5.0,10.0,15.0,20.0,50.0] # Parameter for Prejudice Remover
+y_valid = valid_scaled['label']
+for eta in eta_value:
+    model = PrejudiceRemover(sensitive_attr=sens_attr, eta=eta)
+    model = model.fit(binaryLabelDataset_train)
+    y_pred = model.predict(binaryLabelDataset_valid).scores[:, 0]
+    aucs.append(roc_auc_score(y_valid, y_pred))
+        
+# AUC by eta 
+plt.figure()
+plt.plot(eta_value,aucs)
+plt.ylim([0,1])
+plt.xlabel('eta value (Prejudice Remover parameter)')
+plt.ylabel('AUROC')
+
+#%%
+best_eta = 0.01
+model = PrejudiceRemover(sensitive_attr=sens_attr, eta=best_eta)
+model = model.fit(binaryLabelDataset_train)
+y_pred = model.predict(binaryLabelDataset_valid).scores[:, 0]
+  
+J_optimal_thresh = Youden_J_stat(y_valid, y_pred)  
+F_optimal_thresh = F_score_thresh(y_valid, y_pred)
+
+
+#%%
+
+convert_train_to_num_df = full_train_scaled[keep_cols]
+convert_train_to_num_df['white_vs_all'] = [0 if ethnicity == 'WHITE' else 1 for ethnicity in full_train_scaled.ethnicity] 
+convert_train_to_num_df = convert_train_to_num_df.drop(columns=['ethnicity'])
+
+
+binaryLabelDataset = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_train_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['white_vs_all'])
+
+sens_attr = binaryLabelDataset.protected_attribute_names[0]
+
+binaryLabelDataset.features = binaryLabelDataset.features[:,:104]
+binaryLabelDataset.feature_names = binaryLabelDataset.feature_names[:104]
+
+# convert test data to BinaryLabelDataset
+convert_test_to_num_df = test_scaled[keep_cols]
+convert_test_to_num_df['white_vs_all'] = [0 if ethnicity == 'WHITE' else 1 for ethnicity in test_scaled.ethnicity] 
+convert_test_to_num_df = convert_test_to_num_df.drop(columns=['ethnicity'])
+
+binaryLabelDataset_Xtest = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_test_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['white_vs_all'])
+
+binaryLabelDataset_Xtest.features = binaryLabelDataset_Xtest.features[:,:104]
+binaryLabelDataset_Xtest.feature_names = binaryLabelDataset_Xtest.feature_names[:104]
+
+
+
+model = PrejudiceRemover(sensitive_attr=sens_attr, eta=best_eta)
+model = model.fit(binaryLabelDataset)
+
+# predict outcomes for test set 
+y_pred = model.predict(binaryLabelDataset_Xtest).scores[:, 0]
+# AUC
+auc = roc_auc_score(y_test, y_pred)
+plot_roc_curve(y_test, y_pred,'Prejudice Remover',
+               'Receiver operating characteristic curve: test set',
+               '../results/preliminary_prejudiceremover_white/roc_curve.png')
+
+# Average Precision
+ap = average_precision_score(y_test, y_pred,average='samples')
+plot_pr_curve(y_test,y_pred,'Prejudice Remover',
+               'Precision-recall curve: test set',
+               '../results/preliminary_prejudiceremover_white/precision_recall_curve.png')
+
+#Calibration Curve
+plot_calibration_curve(y_test,y_pred,10,'Prejudice Remover',
+                       'Calibration Plot: test set',
+                       '../results/preliminary_prejudiceremover_white/calibration_curve.png')
+
+results = []
+results.append(['J thresh - validation set'] + output_results(y_test,y_pred,J_optimal_thresh))
+results.append(['F thresh - validation set'] + output_results(y_test,y_pred,F_optimal_thresh))
+
+J_optimal_thresh_test = Youden_J_stat(y_test, y_pred)
+
+F_optimal_thresh_test = F_score_thresh(y_test, y_pred)
+
+results.append(['J thresh - test set'] + output_results(y_test,y_pred,J_optimal_thresh_test))
+results.append(['F thresh - test set'] + output_results(y_test,y_pred,F_optimal_thresh_test))
+
+
+results_df = pd.DataFrame(results)
+results_df.to_excel('../results/preliminary_prejudiceremover_white/overall_model_results.xlsx',
+                  header=['Threshold Type','AUC','AP','ECE','MCE','HLH','HLH_pval','prob_thresh','Precision','Recall','FPR','Balanced Accuracy'])
+
+
+
+subgrp_results = []
+test_results_df = pd.concat([test_scaled,pd.DataFrame(y_pred,columns=['pred_proba'])],axis=1)
+thresh = F_optimal_thresh_test
+
+ethnic_groups = test_results_df.ethnicity.unique()
+    
+for grp in ethnic_groups:
+    sub_df = test_results_df[test_results_df.ethnicity == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+gender_groups = test_results_df.gender.unique()
+
+for grp in gender_groups:
+    sub_df = test_results_df[test_results_df.gender == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+age_groups = test_results_df.age_binned.unique()
+
+for grp in age_groups:
+    sub_df = test_results_df[test_results_df.age_binned == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+groups = test_results_df.groupby(['ethnicity','gender'])
+
+for name, subgroup in groups:
+     
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['ethnicity','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['gender','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['ethnicity','gender','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+    
+subgrp_results_df = pd.DataFrame(subgrp_results,
+                                 columns=['Subgroup','AUC','AP','ECE','MCE','HLH','HLH_pval','prob_thresh','Precision','Recall','FPR','Balanced Accuracy'])
+subgrp_results_df.to_excel('../results/preliminary_prejudiceremover_white/subgroup_results.xlsx')
+
+
+# plot calibration curve by ethnicity
+col = 'ethnicity'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_white/calibration_plot_ethnicity.png')
+
+
+# plot calibration curve by gender
+col = 'gender'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_white/calibration_plot_gender.png')
+
+# plot calibration curve by ethnicity
+col = 'age_binned'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_white/calibration_plot_age.png')
+
+
+# plot calibration curve by ethnicity and gender
+col = ['ethnicity','gender']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_white/calibration_plot_ethnicity_gender.png')
+
+
+# plot calibration curve by ethnicity and age
+col = ['ethnicity','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_white/calibration_plot_ethnicity_age.png')
+
+# plot calibration curve by gender and age
+col = ['gender','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_white/calibration_plot_gender_age.png')
+
+# plot calibration curve by ethnicity, gender and age
+col = ['ethnicity','gender','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_white/calibration_plot_ethnicity_gender_age.png')
+
+
+#%%
+'''
+Apply Prejudice Remover to training daa with White as privileged group and Hispanic/Latino
+and Black/African American as unprivileged group
+'''
+
+keep_cols = keep_features + ['label','ethnicity']
+
+
+convert_train_to_num_df = train_scaled[keep_cols]
+convert_train_to_num_df['white_vs_all'] = [1 if ethnicity == 'WHITE' else 0 for ethnicity in train_scaled.ethnicity] 
+convert_train_to_num_df = convert_train_to_num_df.drop(columns=['ethnicity'])
+
+
+binaryLabelDataset_train = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_train_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['white_vs_all'])
+
+convert_valid_to_num_df = valid_scaled[keep_cols]
+convert_valid_to_num_df['white_vs_all'] = [1 if ethnicity == 'WHITE' else 0 for ethnicity in valid_scaled.ethnicity] 
+convert_valid_to_num_df = convert_valid_to_num_df.drop(columns=['ethnicity'])
+
+
+binaryLabelDataset_valid = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_valid_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['white_vs_all'])
+
+sens_attr = binaryLabelDataset_train.protected_attribute_names[0]
+
+# evaluate the model
+
+aucs = []
+tprs = []
+fprs = []
+eta_value = [0.01,1.0,5.0,10.0,15.0,20.0,50.0] # Parameter for Prejudice Remover
+y_valid = valid_scaled['label']
+for eta in eta_value:
+    model = PrejudiceRemover(sensitive_attr=sens_attr, eta=eta)
+    model = model.fit(binaryLabelDataset_train)
+    y_pred = model.predict(binaryLabelDataset_valid).scores[:, 0]
+    aucs.append(roc_auc_score(y_valid, y_pred))
+        
+# AUC by eta 
+plt.figure()
+plt.plot(eta_value,aucs)
+plt.ylim([0,1])
+plt.xlabel('eta value (Prejudice Remover parameter)')
+plt.ylabel('AUROC')
+
+#%%
+best_eta = 0.01
+model = PrejudiceRemover(sensitive_attr=sens_attr, eta=best_eta)
+model = model.fit(binaryLabelDataset_train)
+y_pred = model.predict(binaryLabelDataset_valid).scores[:, 0]
+  
+J_optimal_thresh = Youden_J_stat(y_valid, y_pred)  
+F_optimal_thresh = F_score_thresh(y_valid, y_pred)
+
+#%%
+
+
+convert_train_to_num_df = full_train_scaled[keep_cols]
+convert_train_to_num_df['white_vs_all'] = [1 if ethnicity == 'WHITE' else 0 for ethnicity in full_train_scaled.ethnicity] 
+convert_train_to_num_df = convert_train_to_num_df.drop(columns=['ethnicity'])
+
+
+binaryLabelDataset = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_train_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['white_vs_all'])
+
+sens_attr = binaryLabelDataset.protected_attribute_names[0]
+model = PrejudiceRemover(sensitive_attr=sens_attr, eta=25.0)
+
+binaryLabelDataset.features = binaryLabelDataset.features[:,:104]
+binaryLabelDataset.feature_names = binaryLabelDataset.feature_names[:104]
+model = model.fit(binaryLabelDataset)
+
+# convert test data to BinaryLabelDataset
+convert_test_to_num_df = test_scaled[keep_cols]
+convert_test_to_num_df['white_vs_all'] = [1 if ethnicity == 'WHITE' else 0 for ethnicity in test_scaled.ethnicity] 
+convert_test_to_num_df = convert_test_to_num_df.drop(columns=['ethnicity'])
+
+binaryLabelDataset_Xtest = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_test_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['white_vs_all'])
+
+binaryLabelDataset_Xtest.features = binaryLabelDataset_Xtest.features[:,:104]
+binaryLabelDataset_Xtest.feature_names = binaryLabelDataset_Xtest.feature_names[:104]
+
+# predict outcomes for test set 
+y_pred = model.predict(binaryLabelDataset_Xtest).scores[:, 0]
+
+# evaluate the model
+# AUC
+auc = roc_auc_score(y_test, y_pred)
+plot_roc_curve(y_test, y_pred,'Prejudice Remover',
+               'Receiver operating characteristic curve: test set',
+               '../results/preliminary_prejudiceremover_black_hispanic/roc_curve.png')
+
+# Average Precision
+ap = average_precision_score(y_test, y_pred,average='samples')
+plot_pr_curve(y_test,y_pred,'Prejudice Remover',
+               'Precision-recall curve: test set',
+               '../results/preliminary_prejudiceremover_black_hispanic/precision_recall_curve.png')
+
+#Calibration Curve
+plot_calibration_curve(y_test,y_pred,10,'Prejudice Remover',
+                       'Calibration Plot: test set',
+                       '../results/preliminary_prejudiceremover_black_hispanic/calibration_curve.png')
+
+results = []
+results.append(['J thresh - validation set'] + output_results(y_test,y_pred,J_optimal_thresh))
+results.append(['F thresh - validation set'] + output_results(y_test,y_pred,F_optimal_thresh))
+
+J_optimal_thresh_test = Youden_J_stat(y_test, y_pred)
+
+F_optimal_thresh_test = F_score_thresh(y_test, y_pred)
+
+results.append(['J thresh - test set'] + output_results(y_test,y_pred,J_optimal_thresh_test))
+results.append(['F thresh - test set'] + output_results(y_test,y_pred,F_optimal_thresh_test))
+
+
+results_df = pd.DataFrame(results)
+results_df.to_excel('../results/preliminary_prejudiceremover_black_hispanic/overall_model_results.xlsx',
+                  header=['Threshold Type','AUC','AP','ECE','MCE','HLH','HLH_pval','prob_thresh','Precision','Recall','FPR','Balanced Accuracy'])
+
+
+
+subgrp_results = []
+test_results_df = pd.concat([test_scaled,pd.DataFrame(y_pred,columns=['pred_proba'])],axis=1)
+thresh = F_optimal_thresh_test
+
+ethnic_groups = test_results_df.ethnicity.unique()
+    
+for grp in ethnic_groups:
+    sub_df = test_results_df[test_results_df.ethnicity == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+gender_groups = test_results_df.gender.unique()
+
+for grp in gender_groups:
+    sub_df = test_results_df[test_results_df.gender == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+age_groups = test_results_df.age_binned.unique()
+
+for grp in age_groups:
+    sub_df = test_results_df[test_results_df.age_binned == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+groups = test_results_df.groupby(['ethnicity','gender'])
+
+for name, subgroup in groups:
+     
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['ethnicity','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['gender','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['ethnicity','gender','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+    
+subgrp_results_df = pd.DataFrame(subgrp_results,
+                                 columns=['Subgroup','AUC','AP','ECE','MCE','HLH','HLH_pval','prob_thresh','Precision','Recall','FPR','Balanced Accuracy'])
+subgrp_results_df.to_excel('../results/preliminary_prejudiceremover_black_hispanic/subgroup_results.xlsx')
+
+
+# plot calibration curve by ethnicity
+col = 'ethnicity'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_black_hispanic/calibration_plot_ethnicity.png')
+
+
+# plot calibration curve by gender
+col = 'gender'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_black_hispanic/calibration_plot_gender.png')
+
+# plot calibration curve by ethnicity
+col = 'age_binned'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_black_hispanic/calibration_plot_age.png')
+
+
+# plot calibration curve by ethnicity and gender
+col = ['ethnicity','gender']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_black_hispanic/calibration_plot_ethnicity_gender.png')
+
+
+# plot calibration curve by ethnicity and age
+col = ['ethnicity','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_black_hispanic/calibration_plot_ethnicity_age.png')
+
+# plot calibration curve by gender and age
+col = ['gender','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_black_hispanic/calibration_plot_gender_age.png')
+
+# plot calibration curve by ethnicity, gender and age
+col = ['ethnicity','gender','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_black_hispanic/calibration_plot_ethnicity_gender_age.png')
+
+
+#%%
+'''
+Apply Prejudice Remover to training data with Black/African American as privileged group and White
+and Hispanic/Latino as unprivileged group
+'''
+
+keep_cols = keep_features + ['label','ethnicity']
+
+
+convert_train_to_num_df = train_scaled[keep_cols]
+convert_train_to_num_df['black_vs_all'] = [1 if ethnicity == 'BLACK/AFRICAN AMERICAN' else 0 for ethnicity in train_scaled.ethnicity] 
+convert_train_to_num_df = convert_train_to_num_df.drop(columns=['ethnicity'])
+
+
+binaryLabelDataset_train = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_train_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['black_vs_all'])
+
+convert_valid_to_num_df = valid_scaled[keep_cols]
+convert_valid_to_num_df['black_vs_all'] = [1 if ethnicity == 'BLACK/AFRICAN AMERICAN' else 0 for ethnicity in valid_scaled.ethnicity] 
+convert_valid_to_num_df = convert_valid_to_num_df.drop(columns=['ethnicity'])
+
+
+binaryLabelDataset_valid = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_valid_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['black_vs_all'])
+
+sens_attr = binaryLabelDataset_train.protected_attribute_names[0]
+
+# evaluate the model
+
+aucs = []
+tprs = []
+fprs = []
+eta_value = [0.01,1.0,5.0,10.0,15.0,20.0,50.0] # Parameter for Prejudice Remover
+y_valid = valid_scaled['label']
+for eta in eta_value:
+    model = PrejudiceRemover(sensitive_attr=sens_attr, eta=eta)
+    model = model.fit(binaryLabelDataset_train)
+    y_pred = model.predict(binaryLabelDataset_valid).scores[:, 0]
+    aucs.append(roc_auc_score(y_valid, y_pred))
+        
+# AUC by eta 
+plt.figure()
+plt.plot(eta_value,aucs)
+plt.ylim([0,1])
+plt.xlabel('eta value (Prejudice Remover parameter)')
+plt.ylabel('AUROC')
+
+#%%
+best_eta = 0.01
+model = PrejudiceRemover(sensitive_attr=sens_attr, eta=best_eta)
+model = model.fit(binaryLabelDataset_train)
+y_pred = model.predict(binaryLabelDataset_valid).scores[:, 0]
+  
+J_optimal_thresh = Youden_J_stat(y_valid, y_pred)  
+F_optimal_thresh = F_score_thresh(y_valid, y_pred)
+
+#%%
+
+
+convert_train_to_num_df = full_train_scaled[keep_cols]
+convert_train_to_num_df['black_vs_all'] = [1 if ethnicity == 'BLACK/AFRICAN AMERICAN' else 0 for ethnicity in full_train_scaled.ethnicity] 
+convert_train_to_num_df = convert_train_to_num_df.drop(columns=['ethnicity'])
+
+
+binaryLabelDataset = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_train_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['black_vs_all'])
+
+sens_attr = binaryLabelDataset.protected_attribute_names[0]
+model = PrejudiceRemover(sensitive_attr=sens_attr, eta=25.0)
+
+binaryLabelDataset.features = binaryLabelDataset.features[:,:104]
+binaryLabelDataset.feature_names = binaryLabelDataset.feature_names[:104]
+model = model.fit(binaryLabelDataset)
+
+# convert test data to BinaryLabelDataset
+convert_test_to_num_df = test_scaled[keep_cols]
+convert_test_to_num_df['black_vs_all'] = [1 if ethnicity == 'BLACK/AFRICAN AMERICAN' else 0 for ethnicity in test_scaled.ethnicity] 
+convert_test_to_num_df = convert_test_to_num_df.drop(columns=['ethnicity'])
+
+binaryLabelDataset_Xtest = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_test_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['black_vs_all'])
+
+binaryLabelDataset_Xtest.features = binaryLabelDataset_Xtest.features[:,:104]
+binaryLabelDataset_Xtest.feature_names = binaryLabelDataset_Xtest.feature_names[:104]
+
+# predict outcomes for test set 
+y_pred = model.predict(binaryLabelDataset_Xtest).scores[:, 0]
+
+# evaluate the model
+# AUC
+auc = roc_auc_score(y_test, y_pred)
+plot_roc_curve(y_test, y_pred,'Prejudice Remover',
+               'Receiver operating characteristic curve: test set',
+               '../results/preliminary_prejudiceremover_white_hispanic/roc_curve.png')
+
+# Average Precision
+ap = average_precision_score(y_test, y_pred,average='samples')
+plot_pr_curve(y_test,y_pred,'Prejudice Remover',
+               'Precision-recall curve: test set',
+               '../results/preliminary_prejudiceremover_white_hispanic/precision_recall_curve.png')
+
+#Calibration Curve
+plot_calibration_curve(y_test,y_pred,10,'Prejudice Remover',
+                       'Calibration Plot: test set',
+                       '../results/preliminary_prejudiceremover_white_hispanic/calibration_curve.png')
+
+results = []
+results.append(['J thresh - validation set'] + output_results(y_test,y_pred,J_optimal_thresh))
+results.append(['F thresh - validation set'] + output_results(y_test,y_pred,F_optimal_thresh))
+
+J_optimal_thresh_test = Youden_J_stat(y_test, y_pred)
+
+F_optimal_thresh_test = F_score_thresh(y_test, y_pred)
+
+results.append(['J thresh - test set'] + output_results(y_test,y_pred,J_optimal_thresh_test))
+results.append(['F thresh - test set'] + output_results(y_test,y_pred,F_optimal_thresh_test))
+
+
+results_df = pd.DataFrame(results)
+results_df.to_excel('../results/preliminary_prejudiceremover_white_hispanic/overall_model_results.xlsx',
+                  header=['Threshold Type','AUC','AP','ECE','MCE','HLH','HLH_pval','prob_thresh','Precision','Recall','FPR','Balanced Accuracy'])
+
+
+
+subgrp_results = []
+test_results_df = pd.concat([test_scaled,pd.DataFrame(y_pred,columns=['pred_proba'])],axis=1)
+thresh = F_optimal_thresh_test
+
+ethnic_groups = test_results_df.ethnicity.unique()
+    
+for grp in ethnic_groups:
+    sub_df = test_results_df[test_results_df.ethnicity == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+gender_groups = test_results_df.gender.unique()
+
+for grp in gender_groups:
+    sub_df = test_results_df[test_results_df.gender == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+age_groups = test_results_df.age_binned.unique()
+
+for grp in age_groups:
+    sub_df = test_results_df[test_results_df.age_binned == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+groups = test_results_df.groupby(['ethnicity','gender'])
+
+for name, subgroup in groups:
+     
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['ethnicity','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['gender','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['ethnicity','gender','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+    
+subgrp_results_df = pd.DataFrame(subgrp_results,
+                                 columns=['Subgroup','AUC','AP','ECE','MCE','HLH','HLH_pval','prob_thresh','Precision','Recall','FPR','Balanced Accuracy'])
+subgrp_results_df.to_excel('../results/preliminary_prejudiceremover_white_hispanic/subgroup_results.xlsx')
+
+
+# plot calibration curve by ethnicity
+col = 'ethnicity'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_white_hispanic/calibration_plot_ethnicity.png')
+
+
+# plot calibration curve by gender
+col = 'gender'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_white_hispanic/calibration_plot_gender.png')
+
+# plot calibration curve by ethnicity
+col = 'age_binned'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_white_hispanic/calibration_plot_age.png')
+
+
+# plot calibration curve by ethnicity and gender
+col = ['ethnicity','gender']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_white_hispanic/calibration_plot_ethnicity_gender.png')
+
+
+# plot calibration curve by ethnicity and age
+col = ['ethnicity','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_white_hispanic/calibration_plot_ethnicity_age.png')
+
+# plot calibration curve by gender and age
+col = ['gender','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_white_hispanic/calibration_plot_gender_age.png')
+
+# plot calibration curve by ethnicity, gender and age
+col = ['ethnicity','gender','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_white_hispanic/calibration_plot_ethnicity_gender_age.png')
+
+#%%
+'''
+Apply Prejudice Remover to training data with Female as privileged group and Male as unprivileged group
+'''
+
+keep_cols = keep_features + ['label','gender']
+
+
+convert_train_to_num_df = train_scaled[keep_cols]
+convert_train_to_num_df['male_vs_all'] = [1 if gender == 'F' else 0 for gender in train_scaled.gender] 
+convert_train_to_num_df = convert_train_to_num_df.drop(columns=['gender'])
+
+
+binaryLabelDataset_train = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_train_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['male_vs_all'])
+
+convert_valid_to_num_df = valid_scaled[keep_cols]
+convert_valid_to_num_df['male_vs_all'] = [1 if gender == 'F' else 0 for gender in valid_scaled.gender] 
+convert_valid_to_num_df = convert_valid_to_num_df.drop(columns=['gender'])
+
+
+binaryLabelDataset_valid = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_valid_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['male_vs_all'])
+
+sens_attr = binaryLabelDataset_train.protected_attribute_names[0]
+
+# evaluate the model
+
+aucs = []
+tprs = []
+fprs = []
+eta_value = [0.01,1.0,5.0,10.0,15.0,20.0,50.0] # Parameter for Prejudice Remover
+y_valid = valid_scaled['label']
+for eta in eta_value:
+    model = PrejudiceRemover(sensitive_attr=sens_attr, eta=eta)
+    model = model.fit(binaryLabelDataset_train)
+    y_pred = model.predict(binaryLabelDataset_valid).scores[:, 0]
+    aucs.append(roc_auc_score(y_valid, y_pred))
+        
+# AUC by eta 
+plt.figure()
+plt.plot(eta_value,aucs)
+plt.ylim([0,1])
+plt.xlabel('eta value (Prejudice Remover parameter)')
+plt.ylabel('AUROC')
+
+#%%
+best_eta = 0.01
+model = PrejudiceRemover(sensitive_attr=sens_attr, eta=best_eta)
+model = model.fit(binaryLabelDataset_train)
+y_pred = model.predict(binaryLabelDataset_valid).scores[:, 0]
+  
+J_optimal_thresh = Youden_J_stat(y_valid, y_pred)  
+F_optimal_thresh = F_score_thresh(y_valid, y_pred)
+
+#%%
+
+
+convert_train_to_num_df = full_train_scaled[keep_cols]
+convert_train_to_num_df['male_vs_all'] = [1 if gender == 'F' else 0 for gender in full_train_scaled.gender] 
+convert_train_to_num_df = convert_train_to_num_df.drop(columns=['gender'])
+
+
+binaryLabelDataset = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_train_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['male_vs_all'])
+
+sens_attr = binaryLabelDataset.protected_attribute_names[0]
+model = PrejudiceRemover(sensitive_attr=sens_attr, eta=25.0)
+
+binaryLabelDataset.features = binaryLabelDataset.features[:,:104]
+binaryLabelDataset.feature_names = binaryLabelDataset.feature_names[:104]
+model = model.fit(binaryLabelDataset)
+
+# convert test data to BinaryLabelDataset
+convert_test_to_num_df = test_scaled[keep_cols]
+convert_test_to_num_df['male_vs_all'] = [1 if gender == 'F' else 0 for gender in test_scaled.gender] 
+convert_test_to_num_df = convert_test_to_num_df.drop(columns=['gender'])
+
+binaryLabelDataset_Xtest = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_test_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['male_vs_all'])
+
+binaryLabelDataset_Xtest.features = binaryLabelDataset_Xtest.features[:,:104]
+binaryLabelDataset_Xtest.feature_names = binaryLabelDataset_Xtest.feature_names[:104]
+
+# predict outcomes for test set 
+y_pred = model.predict(binaryLabelDataset_Xtest).scores[:, 0]
+
+# evaluate the model
+# AUC
+auc = roc_auc_score(y_test, y_pred)
+plot_roc_curve(y_test, y_pred,'Prejudice Remover',
+               'Receiver operating characteristic curve: test set',
+               '../results/preliminary_prejudiceremover_male/roc_curve.png')
+
+# Average Precision
+ap = average_precision_score(y_test, y_pred,average='samples')
+plot_pr_curve(y_test,y_pred,'Prejudice Remover',
+               'Precision-recall curve: test set',
+               '../results/preliminary_prejudiceremover_male/precision_recall_curve.png')
+
+#Calibration Curve
+plot_calibration_curve(y_test,y_pred,10,'Prejudice Remover',
+                       'Calibration Plot: test set',
+                       '../results/preliminary_prejudiceremover_male/calibration_curve.png')
+
+results = []
+results.append(['J thresh - validation set'] + output_results(y_test,y_pred,J_optimal_thresh))
+results.append(['F thresh - validation set'] + output_results(y_test,y_pred,F_optimal_thresh))
+
+J_optimal_thresh_test = Youden_J_stat(y_test, y_pred)
+
+F_optimal_thresh_test = F_score_thresh(y_test, y_pred)
+
+results.append(['J thresh - test set'] + output_results(y_test,y_pred,J_optimal_thresh_test))
+results.append(['F thresh - test set'] + output_results(y_test,y_pred,F_optimal_thresh_test))
+
+
+results_df = pd.DataFrame(results)
+results_df.to_excel('../results/preliminary_prejudiceremover_male/overall_model_results.xlsx',
+                  header=['Threshold Type','AUC','AP','ECE','MCE','HLH','HLH_pval','prob_thresh','Precision','Recall','FPR','Balanced Accuracy'])
+
+
+
+subgrp_results = []
+test_results_df = pd.concat([test_scaled,pd.DataFrame(y_pred,columns=['pred_proba'])],axis=1)
+thresh = F_optimal_thresh_test
+
+ethnic_groups = test_results_df.ethnicity.unique()
+    
+for grp in ethnic_groups:
+    sub_df = test_results_df[test_results_df.ethnicity == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+gender_groups = test_results_df.gender.unique()
+
+for grp in gender_groups:
+    sub_df = test_results_df[test_results_df.gender == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+age_groups = test_results_df.age_binned.unique()
+
+for grp in age_groups:
+    sub_df = test_results_df[test_results_df.age_binned == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+groups = test_results_df.groupby(['ethnicity','gender'])
+
+for name, subgroup in groups:
+     
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['ethnicity','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['gender','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['ethnicity','gender','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+    
+subgrp_results_df = pd.DataFrame(subgrp_results,
+                                 columns=['Subgroup','AUC','AP','ECE','MCE','HLH','HLH_pval','prob_thresh','Precision','Recall','FPR','Balanced Accuracy'])
+subgrp_results_df.to_excel('../results/preliminary_prejudiceremover_male/subgroup_results.xlsx')
+
+
+# plot calibration curve by ethnicity
+col = 'ethnicity'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_male/calibration_plot_ethnicity.png')
+
+
+# plot calibration curve by gender
+col = 'gender'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_male/calibration_plot_gender.png')
+
+# plot calibration curve by ethnicity
+col = 'age_binned'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_male/calibration_plot_age.png')
+
+
+# plot calibration curve by ethnicity and gender
+col = ['ethnicity','gender']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_male/calibration_plot_ethnicity_gender.png')
+
+
+# plot calibration curve by ethnicity and age
+col = ['ethnicity','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_male/calibration_plot_ethnicity_age.png')
+
+# plot calibration curve by gender and age
+col = ['gender','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_male/calibration_plot_gender_age.png')
+
+# plot calibration curve by ethnicity, gender and age
+col = ['ethnicity','gender','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_male/calibration_plot_ethnicity_gender_age.png')
+
+#%%
+'''
+Apply Prejudice Remover to training data with Male as privileged group and Female as unprivileged group
+'''
+
+keep_cols = keep_features + ['label','gender']
+
+
+convert_train_to_num_df = train_scaled[keep_cols]
+convert_train_to_num_df['female_vs_all'] = [1 if gender == 'M' else 0 for gender in train_scaled.gender] 
+convert_train_to_num_df = convert_train_to_num_df.drop(columns=['gender'])
+
+
+binaryLabelDataset_train = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_train_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['female_vs_all'])
+
+convert_valid_to_num_df = valid_scaled[keep_cols]
+convert_valid_to_num_df['female_vs_all'] = [1 if gender == 'M' else 0 for gender in valid_scaled.gender] 
+convert_valid_to_num_df = convert_valid_to_num_df.drop(columns=['gender'])
+
+
+binaryLabelDataset_valid = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_valid_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['female_vs_all'])
+
+sens_attr = binaryLabelDataset_train.protected_attribute_names[0]
+
+# evaluate the model
+
+aucs = []
+tprs = []
+fprs = []
+eta_value = [0.01,1.0,5.0,10.0,15.0,20.0,50.0] # Parameter for Prejudice Remover
+y_valid = valid_scaled['label']
+for eta in eta_value:
+    model = PrejudiceRemover(sensitive_attr=sens_attr, eta=eta)
+    model = model.fit(binaryLabelDataset_train)
+    y_pred = model.predict(binaryLabelDataset_valid).scores[:, 0]
+    aucs.append(roc_auc_score(y_valid, y_pred))
+        
+# AUC by eta 
+plt.figure()
+plt.plot(eta_value,aucs)
+plt.ylim([0,1])
+plt.xlabel('eta value (Prejudice Remover parameter)')
+plt.ylabel('AUROC')
+
+#%%
+best_eta = 0.01
+model = PrejudiceRemover(sensitive_attr=sens_attr, eta=best_eta)
+model = model.fit(binaryLabelDataset_train)
+y_pred = model.predict(binaryLabelDataset_valid).scores[:, 0]
+  
+J_optimal_thresh = Youden_J_stat(y_valid, y_pred)  
+F_optimal_thresh = F_score_thresh(y_valid, y_pred)
+
+#%%
+
+
+convert_train_to_num_df = full_train_scaled[keep_cols]
+convert_train_to_num_df['female_vs_all'] = [1 if gender == 'M' else 0 for gender in full_train_scaled.gender] 
+convert_train_to_num_df = convert_train_to_num_df.drop(columns=['gender'])
+
+
+binaryLabelDataset = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_train_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['female_vs_all'])
+
+sens_attr = binaryLabelDataset.protected_attribute_names[0]
+model = PrejudiceRemover(sensitive_attr=sens_attr, eta=25.0)
+
+binaryLabelDataset.features = binaryLabelDataset.features[:,:104]
+binaryLabelDataset.feature_names = binaryLabelDataset.feature_names[:104]
+model = model.fit(binaryLabelDataset)
+
+# convert test data to BinaryLabelDataset
+convert_test_to_num_df = test_scaled[keep_cols]
+convert_test_to_num_df['female_vs_all'] = [1 if gender == 'M' else 0 for gender in test_scaled.gender] 
+convert_test_to_num_df = convert_test_to_num_df.drop(columns=['gender'])
+
+binaryLabelDataset_Xtest = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_test_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['female_vs_all'])
+
+binaryLabelDataset_Xtest.features = binaryLabelDataset_Xtest.features[:,:104]
+binaryLabelDataset_Xtest.feature_names = binaryLabelDataset_Xtest.feature_names[:104]
+
+# predict outcomes for test set 
+y_pred = model.predict(binaryLabelDataset_Xtest).scores[:, 0]
+
+# evaluate the model
+# AUC
+auc = roc_auc_score(y_test, y_pred)
+plot_roc_curve(y_test, y_pred,'Prejudice Remover',
+               'Receiver operating characteristic curve: test set',
+               '../results/preliminary_prejudiceremover_female/roc_curve.png')
+
+# Average Precision
+ap = average_precision_score(y_test, y_pred,average='samples')
+plot_pr_curve(y_test,y_pred,'Prejudice Remover',
+               'Precision-recall curve: test set',
+               '../results/preliminary_prejudiceremover_female/precision_recall_curve.png')
+
+#Calibration Curve
+plot_calibration_curve(y_test,y_pred,10,'Prejudice Remover',
+                       'Calibration Plot: test set',
+                       '../results/preliminary_prejudiceremover_female/calibration_curve.png')
+
+results = []
+results.append(['J thresh - validation set'] + output_results(y_test,y_pred,J_optimal_thresh))
+results.append(['F thresh - validation set'] + output_results(y_test,y_pred,F_optimal_thresh))
+
+J_optimal_thresh_test = Youden_J_stat(y_test, y_pred)
+
+F_optimal_thresh_test = F_score_thresh(y_test, y_pred)
+
+results.append(['J thresh - test set'] + output_results(y_test,y_pred,J_optimal_thresh_test))
+results.append(['F thresh - test set'] + output_results(y_test,y_pred,F_optimal_thresh_test))
+
+
+results_df = pd.DataFrame(results)
+results_df.to_excel('../results/preliminary_prejudiceremover_female/overall_model_results.xlsx',
+                  header=['Threshold Type','AUC','AP','ECE','MCE','HLH','HLH_pval','prob_thresh','Precision','Recall','FPR','Balanced Accuracy'])
+
+
+
+subgrp_results = []
+test_results_df = pd.concat([test_scaled,pd.DataFrame(y_pred,columns=['pred_proba'])],axis=1)
+thresh = F_optimal_thresh_test
+
+ethnic_groups = test_results_df.ethnicity.unique()
+    
+for grp in ethnic_groups:
+    sub_df = test_results_df[test_results_df.ethnicity == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+gender_groups = test_results_df.gender.unique()
+
+for grp in gender_groups:
+    sub_df = test_results_df[test_results_df.gender == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+age_groups = test_results_df.age_binned.unique()
+
+for grp in age_groups:
+    sub_df = test_results_df[test_results_df.age_binned == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+groups = test_results_df.groupby(['ethnicity','gender'])
+
+for name, subgroup in groups:
+     
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['ethnicity','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['gender','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['ethnicity','gender','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+    
+subgrp_results_df = pd.DataFrame(subgrp_results,
+                                 columns=['Subgroup','AUC','AP','ECE','MCE','HLH','HLH_pval','prob_thresh','Precision','Recall','FPR','Balanced Accuracy'])
+subgrp_results_df.to_excel('../results/preliminary_prejudiceremover_female/subgroup_results.xlsx')
+
+
+# plot calibration curve by ethnicity
+col = 'ethnicity'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_female/calibration_plot_ethnicity.png')
+
+
+# plot calibration curve by gender
+col = 'gender'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_female/calibration_plot_gender.png')
+
+# plot calibration curve by ethnicity
+col = 'age_binned'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_female/calibration_plot_age.png')
+
+
+# plot calibration curve by ethnicity and gender
+col = ['ethnicity','gender']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_female/calibration_plot_ethnicity_gender.png')
+
+
+# plot calibration curve by ethnicity and age
+col = ['ethnicity','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_female/calibration_plot_ethnicity_age.png')
+
+# plot calibration curve by gender and age
+col = ['gender','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_female/calibration_plot_gender_age.png')
+
+# plot calibration curve by ethnicity, gender and age
+col = ['ethnicity','gender','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_female/calibration_plot_ethnicity_gender_age.png')
+
+#%%
+'''
+Apply Prejudice Remover to training data with (17, 64] as privileged group and (64, 91] as unprivileged group
+'''
+
+keep_cols = keep_features + ['label','age_binned']
+
+
+convert_train_to_num_df = train_scaled[keep_cols]
+convert_train_to_num_df['older_vs_all'] = [1 if age_grp == '(17, 64]' else 0 for age_grp in train_scaled.age_binned] 
+convert_train_to_num_df = convert_train_to_num_df.drop(columns=['age_binned'])
+
+
+binaryLabelDataset_train = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_train_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['older_vs_all'])
+
+convert_valid_to_num_df = valid_scaled[keep_cols]
+convert_valid_to_num_df['older_vs_all'] = [1 if age_grp == '(17, 64]' else 0 for age_grp in valid_scaled.age_binned] 
+convert_valid_to_num_df = convert_valid_to_num_df.drop(columns=['age_binned'])
+
+
+binaryLabelDataset_valid = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_valid_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['older_vs_all'])
+
+sens_attr = binaryLabelDataset_train.protected_attribute_names[0]
+
+# evaluate the model
+
+aucs = []
+tprs = []
+fprs = []
+eta_value = [0.01,1.0,5.0,10.0,15.0,20.0,50.0] # Parameter for Prejudice Remover
+y_valid = valid_scaled['label']
+for eta in eta_value:
+    model = PrejudiceRemover(sensitive_attr=sens_attr, eta=eta)
+    model = model.fit(binaryLabelDataset_train)
+    y_pred = model.predict(binaryLabelDataset_valid).scores[:, 0]
+    aucs.append(roc_auc_score(y_valid, y_pred))
+        
+# AUC by eta 
+plt.figure()
+plt.plot(eta_value,aucs)
+plt.ylim([0,1])
+plt.xlabel('eta value (Prejudice Remover parameter)')
+plt.ylabel('AUROC')
+
+#%%
+best_eta = 0.01
+model = PrejudiceRemover(sensitive_attr=sens_attr, eta=best_eta)
+model = model.fit(binaryLabelDataset_train)
+y_pred = model.predict(binaryLabelDataset_valid).scores[:, 0]
+  
+J_optimal_thresh = Youden_J_stat(y_valid, y_pred)  
+F_optimal_thresh = F_score_thresh(y_valid, y_pred)
+
+#%%
+
+
+convert_train_to_num_df = full_train_scaled[keep_cols]
+convert_train_to_num_df['older_vs_all'] = [1 if age_grp == '(17, 64]' else 0 for age_grp in full_train_scaled.age_binned] 
+convert_train_to_num_df = convert_train_to_num_df.drop(columns=['age_binned'])
+
+
+binaryLabelDataset = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_train_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['older_vs_all'])
+
+sens_attr = binaryLabelDataset.protected_attribute_names[0]
+model = PrejudiceRemover(sensitive_attr=sens_attr, eta=25.0)
+
+binaryLabelDataset.features = binaryLabelDataset.features[:,:104]
+binaryLabelDataset.feature_names = binaryLabelDataset.feature_names[:104]
+model = model.fit(binaryLabelDataset)
+
+# convert test data to BinaryLabelDataset
+convert_test_to_num_df = test_scaled[keep_cols]
+convert_test_to_num_df['older_vs_all'] = [1 if age_grp == '(17, 64]' else 0 for age_grp in test_scaled.age_binned] 
+convert_test_to_num_df = convert_test_to_num_df.drop(columns=['age_binned'])
+
+binaryLabelDataset_Xtest = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=convert_test_to_num_df,
+    label_names=['label'],
+    protected_attribute_names=['older_vs_all'])
+
+binaryLabelDataset_Xtest.features = binaryLabelDataset_Xtest.features[:,:104]
+binaryLabelDataset_Xtest.feature_names = binaryLabelDataset_Xtest.feature_names[:104]
+
+# predict outcomes for test set 
+y_pred = model.predict(binaryLabelDataset_Xtest).scores[:, 0]
+
+# evaluate the model
+# AUC
+auc = roc_auc_score(y_test, y_pred)
+plot_roc_curve(y_test, y_pred,'Prejudice Remover',
+               'Receiver operating characteristic curve: test set',
+               '../results/preliminary_prejudiceremover_older/roc_curve.png')
+
+# Average Precision
+ap = average_precision_score(y_test, y_pred,average='samples')
+plot_pr_curve(y_test,y_pred,'Prejudice Remover',
+               'Precision-recall curve: test set',
+               '../results/preliminary_prejudiceremover_older/precision_recall_curve.png')
+
+#Calibration Curve
+plot_calibration_curve(y_test,y_pred,10,'Prejudice Remover',
+                       'Calibration Plot: test set',
+                       '../results/preliminary_prejudiceremover_older/calibration_curve.png')
+
+results = []
+results.append(['J thresh - validation set'] + output_results(y_test,y_pred,J_optimal_thresh))
+results.append(['F thresh - validation set'] + output_results(y_test,y_pred,F_optimal_thresh))
+
+J_optimal_thresh_test = Youden_J_stat(y_test, y_pred)
+
+F_optimal_thresh_test = F_score_thresh(y_test, y_pred)
+
+results.append(['J thresh - test set'] + output_results(y_test,y_pred,J_optimal_thresh_test))
+results.append(['F thresh - test set'] + output_results(y_test,y_pred,F_optimal_thresh_test))
+
+
+results_df = pd.DataFrame(results)
+results_df.to_excel('../results/preliminary_prejudiceremover_older/overall_model_results.xlsx',
+                  header=['Threshold Type','AUC','AP','ECE','MCE','HLH','HLH_pval','prob_thresh','Precision','Recall','FPR','Balanced Accuracy'])
+
+
+
+subgrp_results = []
+test_results_df = pd.concat([test_scaled,pd.DataFrame(y_pred,columns=['pred_proba'])],axis=1)
+thresh = F_optimal_thresh_test
+
+ethnic_groups = test_results_df.ethnicity.unique()
+    
+for grp in ethnic_groups:
+    sub_df = test_results_df[test_results_df.ethnicity == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+gender_groups = test_results_df.gender.unique()
+
+for grp in gender_groups:
+    sub_df = test_results_df[test_results_df.gender == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+age_groups = test_results_df.age_binned.unique()
+
+for grp in age_groups:
+    sub_df = test_results_df[test_results_df.age_binned == grp]
+    
+    result = output_results(sub_df['label'],sub_df['pred_proba'],thresh)
+    subgrp_results.append([grp] + result)
+
+groups = test_results_df.groupby(['ethnicity','gender'])
+
+for name, subgroup in groups:
+     
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['ethnicity','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['gender','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+
+groups = test_results_df.groupby(['ethnicity','gender','age_binned'])
+
+for name, subgroup in groups:
+    result = output_results(subgroup['label'],subgroup['pred_proba'],thresh)
+    subgrp_results.append([name] + result)
+    
+subgrp_results_df = pd.DataFrame(subgrp_results,
+                                 columns=['Subgroup','AUC','AP','ECE','MCE','HLH','HLH_pval','prob_thresh','Precision','Recall','FPR','Balanced Accuracy'])
+subgrp_results_df.to_excel('../results/preliminary_prejudiceremover_older/subgroup_results.xlsx')
+
+
+# plot calibration curve by ethnicity
+col = 'ethnicity'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_older/calibration_plot_ethnicity.png')
+
+
+# plot calibration curve by gender
+col = 'gender'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_older/calibration_plot_gender.png')
+
+# plot calibration curve by ethnicity
+col = 'age_binned'
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_older/calibration_plot_age.png')
+
+
+# plot calibration curve by ethnicity and gender
+col = ['ethnicity','gender']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_older/calibration_plot_ethnicity_gender.png')
+
+
+# plot calibration curve by ethnicity and age
+col = ['ethnicity','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_older/calibration_plot_ethnicity_age.png')
+
+# plot calibration curve by gender and age
+col = ['gender','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_older/calibration_plot_gender_age.png')
+
+# plot calibration curve by ethnicity, gender and age
+col = ['ethnicity','gender','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
+                             plot_title='Calibration Plot - Prejudice Remover',
+                             filename='../results/preliminary_prejudiceremover_older/calibration_plot_ethnicity_gender_age.png')
+
+#%%
+'''
+Apply Calibrated Equalized Odds to training data with (17, 64] as privileged group and (64, 91] as unprivileged group
+'''
