@@ -31,13 +31,13 @@ from sklearn.calibration import CalibratedClassifierCV
 
 class sociodemo_ensemble_model(BaseEstimator,ClassifierMixin):
     def __init__(self):
-        self.female = RandomForestClassifier(n_estimators=300,criterion='entropy',max_features=4,random_state=12)
-        self.male = RandomForestClassifier(n_estimators=100,criterion='gini',max_features=8,random_state=12)
-        self.hispanic = RandomForestClassifier(n_estimators=300,criterion='gini',max_features=6,random_state=12)
-        self.black = RandomForestClassifier(n_estimators=300,criterion='gini',max_features=6,random_state=12)
-        self.white = GradientBoostingClassifier(n_estimators=100,min_samples_split=0.5,min_samples_leaf=0.1,max_features=8,random_state=12)
-        self.age17_64 = RandomForestClassifier(n_estimators=100,criterion='entropy',max_features=10,random_state=12)
-        self.age64_91 = LogisticRegression(max_iter=100,penalty='l2',solver='liblinear',random_state=12)
+        self.female = RandomForestClassifier(n_estimators=200,criterion='entropy',max_features=2,random_state=12)
+        self.male = RandomForestClassifier(n_estimators=200,criterion='entropy',max_features=2,random_state=12)
+        self.hispanic = KNeighborsClassifier(metric='minkowski',n_neighbors=14,weights='uniform')
+        self.black = RandomForestClassifier(n_estimators=100,criterion='entropy',max_features=10,random_state=12)
+        self.white = LogisticRegression(max_iter=100,penalty='l1',solver='liblinear',random_state=12)
+        self.age17_64 = LogisticRegression(max_iter=100,penalty='l2',solver='liblinear',random_state=12)
+        self.age64_91 = GradientBoostingClassifier(n_estimators=100,min_samples_split=0.3,min_samples_leaf=0.3,max_features=4,random_state=12)
   
         
     def fit(self, X_subsets,columns,label=None,oversample=False):
@@ -88,7 +88,7 @@ class sociodemo_ensemble_model(BaseEstimator,ClassifierMixin):
             elif key == 'BLACK/AFRICAN AMERICAN':
                 clf = self.black
                 cclf = CalibratedClassifierCV(base_estimator=clf,
-                                  method='sigmoid',
+                                  method='isotonic',
                                   cv=skf)
                 if oversample:
                     self.black = cclf.fit(X_train_smote,y_train_smote)
@@ -97,9 +97,10 @@ class sociodemo_ensemble_model(BaseEstimator,ClassifierMixin):
                     
             elif key == 'WHITE':
                 clf = self.white
-                cclf = CalibratedClassifierCV(base_estimator=clf,
-                                  method='isotonic',
-                                  cv=skf)
+                cclf = clf
+                #cclf = CalibratedClassifierCV(base_estimator=clf,
+                #                  method='isotonic',
+                #                  cv=skf)
                 if oversample:
                     self.white = cclf.fit(X_train_smote,y_train_smote)
                 else:
@@ -107,9 +108,10 @@ class sociodemo_ensemble_model(BaseEstimator,ClassifierMixin):
                     
             elif key == '(17, 64]':
                 clf = self.age17_64
-                cclf = CalibratedClassifierCV(base_estimator=clf,
-                                  method='sigmoid',
-                                  cv=skf)
+                cclf = clf
+                #cclf = CalibratedClassifierCV(base_estimator=clf,
+                #                  method='sigmoid',
+                #                  cv=skf)
                 if oversample:
                     self.age17_64 = cclf.fit(X_train_smote,y_train_smote)
                 else:
@@ -118,9 +120,9 @@ class sociodemo_ensemble_model(BaseEstimator,ClassifierMixin):
             elif key == '(64, 91]':
                 clf = self.age64_91
                 cclf = clf
-                #cclf = CalibratedClassifierCV(base_estimator=clf,
-                #                  method='isotonic',
-                #                  cv=skf)
+                cclf = CalibratedClassifierCV(base_estimator=clf,
+                                  method='isotonic',
+                                  cv=skf)
                 if oversample:
                     self.age64_91 = cclf.fit(X_train_smote,y_train_smote)
                 else:
@@ -138,13 +140,13 @@ class sociodemo_ensemble_model(BaseEstimator,ClassifierMixin):
                 if x.gender == 'F':
                     x = np.array(x[columns]).reshape(1,-1)
                     prediction = self.female.predict_proba(x)[:,1]
-                    thresh = 0.145125
+                    thresh = 0.088001
                     pred_binary = prediction >= thresh
                     predictions.append([prediction,pred_binary])
                 elif x.gender == 'M':
                     x = np.array(x[columns]).reshape(1,-1)
                     prediction = self.male.predict_proba(x)[:,1]
-                    thresh = 0.017256
+                    thresh = 0.095312
                     pred_binary = prediction >= thresh
                     predictions.append([prediction,pred_binary])
                 else:
@@ -158,19 +160,19 @@ class sociodemo_ensemble_model(BaseEstimator,ClassifierMixin):
                 if x.ethnicity == 'HISPANIC/LATINO':
                     x = np.array(x[columns]).reshape(1,-1)
                     prediction = self.hispanic.predict_proba(x)[:,1]
-                    thresh = 0.018207
+                    thresh = 0.077555
                     pred_binary = prediction >= thresh
                     predictions.append([prediction,pred_binary])
                 elif x.ethnicity == 'BLACK/AFRICAN AMERICAN':
                     x = np.array(x[columns]).reshape(1,-1)
                     prediction = self.black.predict_proba(x)[:,1]
-                    thresh = 0.049823
+                    thresh = 0.141263
                     pred_binary = prediction >= thresh
                     predictions.append([prediction,pred_binary])
                 elif x.ethnicity == 'WHITE':
                     x = np.array(x[columns]).reshape(1,-1)
                     prediction = self.white.predict_proba(x)[:,1]
-                    thresh = 0.174159
+                    thresh = 0.075180
                     pred_binary = prediction >= thresh
                     predictions.append([prediction,pred_binary])
                 else:
@@ -184,13 +186,13 @@ class sociodemo_ensemble_model(BaseEstimator,ClassifierMixin):
                 if x.age_binned == '(17, 64]':
                     x = np.array(x[columns]).reshape(1,-1)
                     prediction = self.age17_64.predict_proba(x)[:,1]
-                    thresh = 0.041449
+                    thresh = 0.104572
                     pred_binary = prediction >= thresh
                     predictions.append([prediction,pred_binary])
                 elif x.age_binned == '(64, 91]':
                     x = np.array(x[columns]).reshape(1,-1)
                     prediction = self.age64_91.predict_proba(x)[:,1]
-                    thresh = 0.451766
+                    thresh = 0.051990
                     pred_binary = prediction >= thresh
                     predictions.append([prediction,pred_binary])
                 else:
@@ -217,13 +219,13 @@ class sociodemo_ensemble_model(BaseEstimator,ClassifierMixin):
 
 class kmeans_ensemble_model(BaseEstimator,ClassifierMixin):
     def __init__(self):
-        self.cluster1of2_12 = RandomForestClassifier(n_estimators=100,criterion='gini',max_features=10,random_state=12)
-        self.cluster2of2_12 = RandomForestClassifier(n_estimators=100,criterion='entropy',max_features=8,random_state=12)
-        self.cluster1of2_24 = RandomForestClassifier(n_estimators=100,criterion='entropy',max_features=12,random_state=12)
-        self.cluster2of2_24 = RandomForestClassifier(n_estimators=100,criterion='entropy',max_features=8,random_state=12)
-        self.cluster1of3 = RandomForestClassifier(n_estimators=100,criterion='gini',max_features=4,random_state=12)
-        self.cluster2of3 = RandomForestClassifier(n_estimators=100,criterion='entropy',max_features=10,random_state=12)
-        self.cluster3of3 = RandomForestClassifier(n_estimators=400,criterion='entropy',max_features=2,random_state=12)
+        self.cluster1of2_12 = RandomForestClassifier(n_estimators=200,criterion='entropy',max_features=2,random_state=12)
+        self.cluster2of2_12 = RandomForestClassifier(n_estimators=400,criterion='entropy',max_features=4,random_state=12)
+        self.cluster1of2_24 = RandomForestClassifier(n_estimators=200,criterion='entropy',max_features=2,random_state=12)
+        self.cluster2of2_24 = RandomForestClassifier(n_estimators=400,criterion='entropy',max_features=4,random_state=12)
+        self.cluster1of3 = RandomForestClassifier(n_estimators=100,criterion='gini',max_features=8,random_state=12)
+        self.cluster2of3 = GradientBoostingClassifier(n_estimators=200,max_features=2,min_samples_leaf=0.3,min_samples_split=0.9,random_state=12)
+        self.cluster3of3 = KNeighborsClassifier(metric='euclidean',n_neighbors=7,weights='distance')
                 
     def fit(self, X_subsets,columns,label=None,oversample=False):
         if label == None:
@@ -252,7 +254,7 @@ class kmeans_ensemble_model(BaseEstimator,ClassifierMixin):
             elif key == 'cluster2of2_12':
                 clf = self.cluster2of2_12
                 cclf = CalibratedClassifierCV(base_estimator=clf,
-                                  method='sigmoid',
+                                  method='isotonic',
                                   cv=skf)
                 if oversample:
                     self.cluster2of2_12 = cclf.fit(X_train_smote,y_train_smote)
@@ -261,7 +263,7 @@ class kmeans_ensemble_model(BaseEstimator,ClassifierMixin):
             elif key == 'cluster1of2_24':
                 clf = self.cluster1of2_24
                 cclf = CalibratedClassifierCV(base_estimator=clf,
-                                  method='sigmoid',
+                                  method='isotonic',
                                   cv=skf)
                 if oversample:
                     self.cluster1of2_24 = cclf.fit(X_train_smote,y_train_smote)
@@ -297,7 +299,7 @@ class kmeans_ensemble_model(BaseEstimator,ClassifierMixin):
             elif key == 'cluster3of3':
                 clf = self.cluster3of3
                 cclf = CalibratedClassifierCV(base_estimator=clf,
-                                  method='isotonic',
+                                  method='sigmoid',
                                   cv=skf)
                 if oversample:
                     self.cluster3of3 = cclf.fit(X_train_smote,y_train_smote)
@@ -322,13 +324,13 @@ class kmeans_ensemble_model(BaseEstimator,ClassifierMixin):
                 if x.cluster_label == 0:
                     x = np.array(x[columns]).reshape(1,-1)
                     prediction = self.cluster1of2_12.predict_proba(x)[:,1]
-                    thresh = 0.116056
+                    thresh = 0.101139
                     pred_binary = prediction >= thresh
                     predictions.append([prediction,pred_binary])
                 elif x.cluster_label == 1:
                     x = np.array(x[columns]).reshape(1,-1)
                     prediction = self.cluster2of2_12.predict_proba(x)[:,1]
-                    thresh = 0.031127
+                    thresh = 0.090892
                     pred_binary = prediction >= thresh
                     predictions.append([prediction,pred_binary])
                 else:
@@ -347,19 +349,19 @@ class kmeans_ensemble_model(BaseEstimator,ClassifierMixin):
                 if x.cluster_label == 0:
                     x = np.array(x[columns]).reshape(1,-1)
                     prediction = self.cluster1of3.predict_proba(x)[:,1]
-                    thresh = 0.038972
+                    thresh = 0.061314
                     pred_binary = prediction >= thresh
                     predictions.append([prediction,pred_binary])
                 elif x.cluster_label == 1:
                     x = np.array(x[columns]).reshape(1,-1)
                     prediction = self.cluster2of3.predict_proba(x)[:,1]
-                    thresh = 0.031861
+                    thresh = 0.064146
                     pred_binary = prediction >= thresh
                     predictions.append([prediction,pred_binary])
                 elif x.cluster_label == 2:
                     x = np.array(x[columns]).reshape(1,-1)
                     prediction = self.cluster3of3.predict_proba(x)[:,1]
-                    thresh = 0.120326
+                    thresh = 0.205981
                     pred_binary = prediction >= thresh
                     predictions.append([prediction,pred_binary])
                 else:
@@ -378,13 +380,13 @@ class kmeans_ensemble_model(BaseEstimator,ClassifierMixin):
                 if x.cluster_label == 0:
                     x = np.array(x[columns]).reshape(1,-1)
                     prediction = self.cluster1of2_24.predict_proba(x)[:,1]
-                    thresh = 0.140491
+                    thresh = 0.101139
                     pred_binary = prediction >= thresh
                     predictions.append([prediction,pred_binary])
                 elif x.cluster_label == 1:
                     x = np.array(x[columns]).reshape(1,-1)
                     prediction = self.cluster2of2_24.predict_proba(x)[:,1]
-                    thresh = 0.013412
+                    thresh = 0.090892
                     pred_binary = prediction >= thresh
                     predictions.append([prediction,pred_binary])
                 else:

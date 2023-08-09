@@ -24,11 +24,13 @@ def demo_subsets(df,demographics={}):
 
 def kmeans_subsets(df,columns,num_clusters=[],rnd_seeds=[]):
     
-    df_copy = df.copy()
+    df_saved = df.copy()
     df = df[columns]
     
     subsets = {}
     for idx in range(len(num_clusters)):
+        df_copy = df_saved.copy()
+        
         km = KMeans(n_clusters=num_clusters[idx],random_state=rnd_seeds[idx])
         km.fit(df)
         

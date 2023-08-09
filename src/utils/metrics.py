@@ -22,16 +22,16 @@ def Youden_J_thresh(y_true,y_pred):
     
     fpr, tpr, thresholds = roc_curve(y_true, y_pred)
     # determine optimal threshold
+    print(thresholds)
     J = tpr - fpr
+    print(J)
     idx = np.argmax(J)
     best_thresh = thresholds[idx]
-    print('Best Threshold=%f' % (best_thresh))
+    print('Best Threshold=%f, J-statistic=%.3f' % (best_thresh, J[idx]))
     return best_thresh
 
 def F_score_thresh(y_true,y_pred):
     precision, recall, thresholds = precision_recall_curve(y_true, y_pred)
-    print(precision)
-    print(recall)
     # compute f score
     fscore = (2 * precision * recall) / (precision + recall)
     fscore = np.nan_to_num(fscore,nan=0)
@@ -132,7 +132,8 @@ def output_results(y_true,y_pred,prob_thresh=None):
         precision = precision_score(y_true, pred)
         tn, fp, fn, tp = confusion_matrix(y_true, pred).ravel()
         fpr = fp/(fp+tn)
+        fnr = fn/(fn+tp)
         recall = recall_score(y_true, pred)
         bal_acc = balanced_accuracy_score(y_true, pred)
     
-    return [auc,ap,ece,mce,hlh,pval,prob_thresh,precision,recall,fpr,bal_acc]
+    return [auc,ap,fpr,fnr,ece,mce,hlh,pval,prob_thresh,precision,recall,bal_acc]

@@ -37,7 +37,7 @@ from utils.metrics import Youden_J_thresh, F_score_thresh,output_results
 
 # import plots
 from sklearn.calibration import calibration_curve
-from utils.plots import plot_roc_curve,plot_calibration_curve,plot_pr_curve,plot_calibration_by_subgroup
+from utils.plots import plot_roc_curve,plot_calibration_curve,plot_pr_curve,plot_calibration_by_subgroup,calibration_barplot
 #%%
 # import train, validation, and test sets 
 train = pd.read_csv('../data/train_data.csv')
@@ -52,7 +52,7 @@ keep_features.extend(train_df.columns.tolist()[1:12])
 #%%
 # min-max normalization 
 scaler = MinMaxScaler()
-scaler.fit(train[keep_features])
+scaler.fit(train_df[keep_features])
 
 # normalize train data
 train_scaled = scaler.transform(train_df[keep_features])
@@ -80,7 +80,7 @@ demographics = {'ethnicity': train_scaled.ethnicity.unique().tolist(),
 demo_subsets = demo_subsets(train_scaled,demographics)
 
  
-
+#%%
 def run_CV(X,y,subgroup_name):
 
     classifiers = {
@@ -97,12 +97,13 @@ def run_CV(X,y,subgroup_name):
         for key in classifiers:
             estimator = CalibratedClassifierCV(classifiers[key],method=method,cv=skf)
             model = Pipeline([
-                        ('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
+                        #('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
                         ('model', estimator)])
             
             
             save_results_to_filename = '../results/ensemble_subgroup_cv/'+ str(subgroup_name) + '_' + str(key) + '_' + str(method) + '.xlsx'
             cross_validation(model,X,y,save_results_to_filename)
+
 #%%
 
 # cross validation 
@@ -120,7 +121,7 @@ for key, values in demo_subsets.items():
         y = val['label']
         X = val.drop(columns=['label'])
         
-        X_train, X_valid, y_train, y_valid = train_test_split(X,y,test_size=0.3,
+        X_train, X_valid, y_train, y_valid = train_test_split(X,y,test_size=0.25,
                                                     stratify=pd.concat([X[['ethnicity','gender','age_binned']], y],axis=1),
                                                     random_state=12)
         '''
@@ -142,7 +143,7 @@ for key, values in demo_subsets.items():
         
         lr = LogisticRegression(random_state=12)
         model = Pipeline([
-                            ('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
+                            #('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
                             ('model', lr)])
         
         
@@ -160,9 +161,7 @@ scoring = {"AUC": "roc_auc",
 parameters = {
                 'F': ['gender','isotonic'],
                 'M': ['gender', 'sigmoid'],
-                '(17, 64]': ['age_binned', 'sigmoid'],
-                'HISPANIC_LATINO': ['ethnicity', 'isotonic'],
-                'BLACK_AFRICAN AMERICAN': ['ethnicity', 'sigmoid']
+                'BLACK_AFRICAN AMERICAN': ['ethnicity', 'isotonic']
                 
                 }
 
@@ -177,7 +176,7 @@ for key, values in parameters.items():
     X = subgrp_df.drop(columns=['label'])
     
     
-    X_train, X_valid, y_train, y_valid = train_test_split(X,y,test_size=0.3,
+    X_train, X_valid, y_train, y_valid = train_test_split(X,y,test_size=0.25,
                                                     stratify=pd.concat([X[['ethnicity','gender','age_binned']], y],axis=1),
                                                     random_state=12)
 
@@ -215,7 +214,7 @@ for key, values in parameters.items():
      
     estimator = CalibratedClassifierCV(classifier,method=calibration_method,cv=skf)
     model = Pipeline([
-                        ('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
+                        #('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
                         ('model', estimator)])
     
     param_grid = {
@@ -242,7 +241,7 @@ for key, values in parameters.items():
 # Randomized search w/ Gradient Boosting on validation set for the White subgroup 
 
 parameters = {
-                  'WHITE': ['ethnicity', 'isotonic']  
+                '(64, 91]': ['age_binned','isotonic']
                 }
 
 for key, values in parameters.items():
@@ -256,7 +255,7 @@ for key, values in parameters.items():
     X = subgrp_df.drop(columns=['label'])
     
     
-    X_train, X_valid, y_train, y_valid = train_test_split(X,y,test_size=0.3,
+    X_train, X_valid, y_train, y_valid = train_test_split(X,y,test_size=0.25,
                                                     stratify=pd.concat([X[['ethnicity','gender','age_binned']], y],axis=1),
                                                     random_state=12)
 
@@ -297,7 +296,7 @@ for key, values in parameters.items():
      
     estimator = CalibratedClassifierCV(classifier,method=calibration_method,cv=skf)
     model = Pipeline([
-                        ('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
+                        #('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
                         ('model', estimator)])
     
     param_grid = {
@@ -324,6 +323,7 @@ for key, values in parameters.items():
 # Randomized search w/ KNN on validation set for the Hispanic ethnic subgroup and 65 to 91 age group 
 
 parameters = {
+                'HISPANIC_LATINO': ['ethnicity','isotonic']
                 
                 }
 
@@ -338,11 +338,11 @@ for key, values in parameters.items():
     X = subgrp_df.drop(columns=['label'])
     
     
-    X_train, X_valid, y_train, y_valid = train_test_split(X,y,test_size=0.3,
+    X_train, X_valid, y_train, y_valid = train_test_split(X,y,test_size=0.25,
                                                     stratify=pd.concat([X[['ethnicity','gender','age_binned']], y],axis=1),
                                                     random_state=12)
 
-    # min-max normalization 
+    '''# min-max normalization 
     scaler = MinMaxScaler()
     scaler.fit(X_train[keep_features])
 
@@ -355,6 +355,8 @@ for key, values in parameters.items():
     X_train = train_scaled[keep_features].to_numpy()
     y_train = y_train.to_numpy()
     
+    X_valid = X_valid[keep_features].to_numpy()
+    y_valid = y_valid.to_numpy()
     
     
     valid_scaled = scaler.transform(X_valid[keep_features])
@@ -363,7 +365,13 @@ for key, values in parameters.items():
     
     X_valid = valid_scaled[keep_features].to_numpy()
     y_valid = y_valid.to_numpy()
-
+    '''
+    
+    X_train = X_train[keep_features].to_numpy()
+    y_train = y_train.to_numpy()
+    
+    X_valid = X_valid[keep_features].to_numpy()
+    y_valid = y_valid.to_numpy()
 
     classifier = KNeighborsClassifier()
     calibration_method = values[1]
@@ -372,7 +380,7 @@ for key, values in parameters.items():
      
     estimator = CalibratedClassifierCV(classifier,method=calibration_method,cv=skf)
     model = Pipeline([
-                        ('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
+                        #('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
                         ('model', estimator)])
     
     param_grid = {
@@ -401,8 +409,8 @@ for key, values in parameters.items():
 # Randomized search w/ Logsitic Regression on validation set for the 65 to 91 age group 
 
 parameters = {
-                '(64, 91]': ['age_binned']
-                
+                '(17, 64]': ['age_binned'], 
+                'WHITE': ['ethnicity']
                 }
 
 
@@ -417,7 +425,7 @@ for key, values in parameters.items():
     X = subgrp_df.drop(columns=['label'])
     
     
-    X_train, X_valid, y_train, y_valid = train_test_split(X,y,test_size=0.3,
+    X_train, X_valid, y_train, y_valid = train_test_split(X,y,test_size=0.25,
                                                     stratify=pd.concat([X[['ethnicity','gender','age_binned']], y],axis=1),
                                                     random_state=12)
 
@@ -453,7 +461,7 @@ for key, values in parameters.items():
     
     classifier = LogisticRegression(random_state=12)
     model = Pipeline([
-                        ('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
+                        #('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
                         ('model', classifier)])
     param_grid = {
             'model__penalty': ('l1','l2'),
@@ -482,85 +490,87 @@ def return_train_test_split(subgroup_type,subgroup_name):
     X = subgrp_df.drop(columns=['label'])
     
     
-    X_train, X_valid, y_train, y_valid = train_test_split(X,y,test_size=0.3,
+    X_train, X_valid, y_train, y_valid = train_test_split(X,y,test_size=0.25,
                                                     stratify=pd.concat([X[['ethnicity','gender','age_binned']], y],axis=1),
                                                     random_state=12)
     
     return X_train, X_valid, y_train, y_valid
-    
+#%%    
 # determine optimal thresh for Female model
 X_train, X_valid, y_train, y_valid = return_train_test_split('gender', 'F')
-classifier = RandomForestClassifier(n_estimators=300,criterion='entropy',max_features=4,random_state=12)
+classifier = RandomForestClassifier(n_estimators=200,criterion='entropy',max_features=2,random_state=12)
 skf = StratifiedKFold(n_splits=10,shuffle=True,random_state=12)
 estimator = CalibratedClassifierCV(classifier,method='isotonic',cv=skf)
 model = Pipeline([
-                    ('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
+                    #('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
                     ('model', estimator)])
 model.fit(X_train[keep_features],y_train)
 y_pred = model.predict_proba(X_valid[keep_features])[:,1]
 J_optimal_thresh = Youden_J_thresh(y_valid, y_pred)
 
+#%%
 # determine optimal thresh for Male model
 X_train, X_valid, y_train, y_valid = return_train_test_split('gender', 'M')
-classifier = RandomForestClassifier(n_estimators=100,criterion='gini',max_features=8,random_state=12)
+classifier = RandomForestClassifier(n_estimators=200,criterion='entropy',max_features=2,random_state=12)
 estimator = CalibratedClassifierCV(classifier,method='sigmoid',cv=skf)
 model = Pipeline([
-                    ('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
+                    #('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
                     ('model', estimator)])
 model.fit(X_train[keep_features],y_train)
 y_pred = model.predict_proba(X_valid[keep_features])[:,1]
 J_optimal_thresh = Youden_J_thresh(y_valid, y_pred)
-
+#%%
 # Hispanic
 X_train, X_valid, y_train, y_valid = return_train_test_split('ethnicity', 'HISPANIC_LATINO')
-classifier = RandomForestClassifier(n_estimators=300,criterion='gini',max_features=6,random_state=12)
+classifier = KNeighborsClassifier(metric='minkowski',n_neighbors=14,weights='uniform')
 estimator = CalibratedClassifierCV(classifier,method='isotonic',cv=skf)
 model = Pipeline([
-                    ('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
+                    #('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
                     ('model', estimator)])
 model.fit(X_train[keep_features],y_train)
 y_pred = model.predict_proba(X_valid[keep_features])[:,1]
 J_optimal_thresh = Youden_J_thresh(y_valid, y_pred)
-
+#%%
 # Black
 X_train, X_valid, y_train, y_valid = return_train_test_split('ethnicity', 'BLACK_AFRICAN AMERICAN')
-classifier = RandomForestClassifier(n_estimators=300,criterion='gini',max_features=6,random_state=12)
-estimator = CalibratedClassifierCV(classifier,method='sigmoid',cv=skf)
-model = Pipeline([
-                    ('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
-                    ('model', estimator)])
-model.fit(X_train[keep_features],y_train)
-y_pred = model.predict_proba(X_valid[keep_features])[:,1]
-J_optimal_thresh = Youden_J_thresh(y_valid, y_pred)
-
-# White
-X_train, X_valid, y_train, y_valid = return_train_test_split('ethnicity', 'WHITE')
-classifier = GradientBoostingClassifier(n_estimators=100,min_samples_split=0.5,min_samples_leaf=0.1,max_features=8,random_state=12)
+classifier = RandomForestClassifier(n_estimators=100,criterion='entropy',max_features=10,random_state=12)
 estimator = CalibratedClassifierCV(classifier,method='isotonic',cv=skf)
 model = Pipeline([
-                    ('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
+                    #('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
                     ('model', estimator)])
 model.fit(X_train[keep_features],y_train)
 y_pred = model.predict_proba(X_valid[keep_features])[:,1]
 J_optimal_thresh = Youden_J_thresh(y_valid, y_pred)
-
+#%%
+# White
+X_train, X_valid, y_train, y_valid = return_train_test_split('ethnicity', 'WHITE')
+classifier = LogisticRegression(max_iter=100,penalty='l1',solver='liblinear',random_state=12)
+#estimator = CalibratedClassifierCV(classifier,method='isotonic',cv=skf)
+model = Pipeline([
+                    #('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
+                    ('model', classifier)])
+model.fit(X_train[keep_features],y_train)
+y_pred = model.predict_proba(X_valid[keep_features])[:,1]
+J_optimal_thresh = Youden_J_thresh(y_valid, y_pred)
+#%%
 # 17-64
 X_train, X_valid, y_train, y_valid = return_train_test_split('age_binned', '(17, 64]')
-classifier = RandomForestClassifier(n_estimators=100,criterion='entropy',max_features=10,random_state=12)
-estimator = CalibratedClassifierCV(classifier,method='sigmoid',cv=skf)
+classifier = LogisticRegression(max_iter=100,penalty='l2',solver='liblinear',random_state=12)
+#estimator = CalibratedClassifierCV(classifier,method='sigmoid',cv=skf)
 model = Pipeline([
-                    ('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
-                    ('model', estimator)])
+                    #('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
+                    ('model', classifier)])
 model.fit(X_train[keep_features],y_train)
 y_pred = model.predict_proba(X_valid[keep_features])[:,1]
 J_optimal_thresh = Youden_J_thresh(y_valid, y_pred)
-
+#%%
 # 64 - 91
-X_train, X_valid, y_train, y_valid = return_train_test_split('age_binned', '(64, 91[')
-classifier = LogisticRegression(max_iter=100,penalty='l2',solver='liblinear',random_state=12)
+X_train, X_valid, y_train, y_valid = return_train_test_split('age_binned', '(64, 91]')
+classifier = GradientBoostingClassifier(n_estimators=100,min_samples_split=0.3,min_samples_leaf=0.3,max_features=4,random_state=12)
+estimator = CalibratedClassifierCV(classifier,method='isotonic',cv=skf)
 model = Pipeline([
-                    ('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
-                    ('model', classifier)])
+                    #('sampling', SMOTE(sampling_strategy=1.0,random_state=12)),
+                    ('model', estimator)])
 model.fit(X_train[keep_features],y_train)
 y_pred = model.predict_proba(X_valid[keep_features])[:,1]
 J_optimal_thresh = Youden_J_thresh(y_valid, y_pred)
@@ -592,18 +602,18 @@ y_test = test_scaled['label'].to_numpy()
 # evaluate ensemble method based on social identities with test data
 
 true_label = 'label'
-sociodemo_subsets = {'F': train_df[train_df.gender == 'F'],
-                'M': train_df[train_df.gender == 'M'],
-                'WHITE': train_df[train_df.ethnicity == 'WHITE'],
-                'HISPANIC/LATINO': train_df[train_df.ethnicity == 'HISPANIC/LATINO'],
-                'BLACK/AFRICAN AMERICAN': train_df[train_df.ethnicity == 'BLACK/AFRICAN AMERICAN'],
-                '(17, 64]': train_df[train_df.age_binned == '(17, 64]'],
-                '(64, 91]': train_df[train_df.age_binned == '(64, 91]'],
+sociodemo_subsets = {'F': train_scaled[train_scaled.gender == 'F'],
+                'M': train_scaled[train_scaled.gender == 'M'],
+                'WHITE': train_scaled[train_scaled.ethnicity == 'WHITE'],
+                'HISPANIC/LATINO': train_scaled[train_scaled.ethnicity == 'HISPANIC/LATINO'],
+                'BLACK/AFRICAN AMERICAN': train_scaled[train_scaled.ethnicity == 'BLACK/AFRICAN AMERICAN'],
+                '(17, 64]': train_scaled[train_scaled.age_binned == '(17, 64]'],
+                '(64, 91]': train_scaled[train_scaled.age_binned == '(64, 91]'],
 
                 }
 
 model = sociodemo_ensemble_model()
-model.fit(sociodemo_subsets,keep_features,true_label,oversample=True)
+model.fit(sociodemo_subsets,keep_features,true_label,oversample=False)
 proba_pred = model.predict_proba(test_scaled,keep_features,true_label)
 
 #%%
@@ -611,7 +621,7 @@ proba_pred = model.predict_proba(test_scaled,keep_features,true_label)
 # evaluate the model
 # AUC
 y_test = test_scaled[true_label]
-y_pred = proba_pred['predict_proba_averaged']
+y_pred = proba_pred['predict_proba_averaged'].astype('float64')
 
 auc = roc_auc_score(y_test, y_pred)
 plot_roc_curve(y_test, y_pred,'Sociodemographic-based Ensemble Model',
@@ -625,9 +635,13 @@ plot_pr_curve(y_test,y_pred,'Sociodemographic-based Ensemble Model',
                '../results/ensemble_subgroup_test/precision_recall_curve.png')
 
 #Calibration Curve
-plot_calibration_curve(y_test,y_pred,10,'Sociodemographic-based Ensemble Model',
+plot_calibration_curve(y_test,y_pred,5,'Sociodemographic-based Ensemble Model',
                        'Calibration Plot: test set',
                        '../results/ensemble_subgroup_test/calibration_curve.png')
+
+plot_calibration_barplot(y_test,y_pred,5,'7-day Readmission Sociodemographic-based Ensemble Model',
+                       '../results/ensemble_clustering_test/calibration_barplot.png')
+
 
 #%%
 
@@ -643,7 +657,7 @@ results.append(['F thresh - test set'] + output_results(y_test,y_pred,F_optimal_
 
 results_df = pd.DataFrame(results)
 results_df.to_excel('../results/ensemble_subgroup_test/overall_model_results.xlsx',
-                  header=['Threshold Type','AUC','AP','ECE','MCE','HLH','HLH_pval','prob_thresh','Precision','Recall','FPR','Balanced Accuracy'])
+                  header=['Threshold Type','AUC','AP','FPR','FNR','ECE','MCE','HLH','HLH_pval','prob_thresh','Precision','Recall','Balanced Accuracy'])
 
 #%%
 
@@ -701,7 +715,7 @@ for name, subgroup in groups:
     subgrp_results.append([name] + result)
     
 subgrp_results_df = pd.DataFrame(subgrp_results,
-                                 columns=['Subgroup','AUC','AP','ECE','MCE','HLH','HLH_pval','prob_thresh','Precision','Recall','FPR','Balanced Accuracy'])
+                                 columns=['Subgroup','AUC','AP','FPR','FNR','ECE','MCE','HLH','HLH_pval','prob_thresh','Precision','Recall','Balanced Accuracy'])
 subgrp_results_df.to_excel('../results/ensemble_subgroup_test/subgroup_results.xlsx')
 
 #%%
@@ -709,8 +723,8 @@ subgrp_results_df.to_excel('../results/ensemble_subgroup_test/subgroup_results.x
 col = 'ethnicity'
 true_label = 'label'
 pred_label = 'pred_proba'
-plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
-                             plot_title='Calibration Plot - Random Forest model',
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,5,
+                             plot_title='Calibration Plot - Sociodemographic-based Ensemble Model',
                              filename='../results/ensemble_subgroup_test/calibration_plot_ethnicity.png')
 
 
@@ -718,16 +732,16 @@ plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
 col = 'gender'
 true_label = 'label'
 pred_label = 'pred_proba'
-plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
-                             plot_title='Calibration Plot - Random Forest model',
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,5,
+                             plot_title='Calibration Plot - Sociodemographic-based Ensemble Model',
                              filename='../results/ensemble_subgroup_test/calibration_plot_gender.png')
 
 # plot calibration curve by ethnicity
 col = 'age_binned'
 true_label = 'label'
 pred_label = 'pred_proba'
-plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
-                             plot_title='Calibration Plot - Random Forest model',
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,5,
+                             plot_title='Calibration Plot - Sociodemographic-based Ensemble Model',
                              filename='../results/ensemble_subgroup_test/calibration_plot_age.png')
 
 
@@ -735,9 +749,125 @@ plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
 col = ['ethnicity','gender']
 true_label = 'label'
 pred_label = 'pred_proba'
-plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,10,
-                             plot_title='Calibration Plot - Random Forest model',
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,5,
+                             plot_title='Calibration Plot - Sociodemographic-based Ensemble Model',
                              filename='../results/ensemble_subgroup_test/calibration_plot_ethnicity_gender.png')
 
+#%%
+# plot calibration curve by ethnicity and age
+col = ['ethnicity','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,5,
+                             plot_title='Calibration Plot - Sociodemographic-based Ensemble Model',
+                             filename='../results/ensemble_subgroup_test/calibration_plot_ethnicity_age.png')
 
+# plot calibration curve by gender and age
+col = ['gender','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,5,
+                             plot_title='Calibration Plot - Sociodemographic-based Ensemble Model',
+                             filename='../results/ensemble_subgroup_test/calibration_plot_gender_age.png')
+
+# plot calibration curve by ethnicity, gender and age
+col = ['ethnicity','gender','age_binned']
+true_label = 'label'
+pred_label = 'pred_proba'
+plot_calibration_by_subgroup(test_results_df,col,true_label,pred_label,5,
+                             plot_title='Calibration Plot - Sociodemographic-based Ensemble Model',
+                             filename='../results/ensemble_subgroup_test/calibration_plot_ethnicity_gender_age.png')
+
+
+#%%
+ethnic_groups = test_results_df.ethnicity.unique()
+results = []
+for grp in ethnic_groups:
+    sub_df = test_results_df[test_results_df.ethnicity == grp]
+
+    prob_true, prob_pred = calibration_curve(sub_df['label'],sub_df['pred_proba'],n_bins=5,strategy='uniform')
+    results.append([str(grp),prob_true, prob_pred])
+
+results_df = pd.DataFrame(results)
+results_df.to_excel('../results/ensemble_subgroup_test/ethnicity_calibration.xlsx',
+                  header=['Ethnicity','Prob_true','Prob_pred'])
+
+#%%
+groups = test_results_df.gender.unique()
+results = []
+for grp in groups:
+    sub_df = test_results_df[test_results_df.gender == grp]
+
+    prob_true, prob_pred = calibration_curve(sub_df['label'],sub_df['pred_proba'],n_bins=5,strategy='uniform')
+    results.append([str(grp),prob_true, prob_pred])
+
+results_df = pd.DataFrame(results)
+results_df.to_excel('../results/ensemble_subgroup_test/gender_calibration.xlsx',
+                  header=['Gender','Prob_true','Prob_pred'])
+
+groups = test_results_df.age_binned.unique()
+results = []
+for grp in groups:
+    sub_df = test_results_df[test_results_df.age_binned == grp]
+
+    prob_true, prob_pred = calibration_curve(sub_df['label'],sub_df['pred_proba'],n_bins=5,strategy='uniform')
+    results.append([str(grp),prob_true, prob_pred])
+    
+    groups = test_results_df.gender.unique()
+
+results_df = pd.DataFrame(results)
+results_df.to_excel('../results/ensemble_subgroup_test/age_calibration.xlsx',
+                  header=['Age','Prob_true','Prob_pred'])
+
+results = []
+groups = test_results_df.groupby(['ethnicity','gender'])
+
+for name, grp in groups:
+    sub_df = grp
+
+    prob_true, prob_pred = calibration_curve(sub_df['label'],sub_df['pred_proba'],n_bins=5,strategy='uniform')
+    results.append([str(name),prob_true, prob_pred])
+    
+results_df = pd.DataFrame(results)
+results_df.to_excel('../results/ensemble_subgroup_test/ethnicity_gender_calibration.xlsx',
+                  header=['Subgroup','Prob_true','Prob_pred'])
+
+results = []
+groups = test_results_df.groupby(['ethnicity','age_binned'])
+
+for name, grp in groups:
+    sub_df = grp
+
+    prob_true, prob_pred = calibration_curve(sub_df['label'],sub_df['pred_proba'],n_bins=5,strategy='uniform')
+    results.append([str(name),prob_true, prob_pred])
+
+results_df = pd.DataFrame(results)
+results_df.to_excel('../results/ensemble_subgroup_test/ethnicity_age_calibration.xlsx',
+                  header=['Subgroup','Prob_true','Prob_pred'])
+
+results = []
+groups = test_results_df.groupby(['gender','age_binned'])
+
+for name, grp in groups:
+    sub_df = grp
+
+    prob_true, prob_pred = calibration_curve(sub_df['label'],sub_df['pred_proba'],n_bins=5,strategy='uniform')
+    results.append([str(name),prob_true, prob_pred])
+    
+results_df = pd.DataFrame(results)
+results_df.to_excel('../results/ensemble_subgroup_test/gender_age_calibration.xlsx',
+                  header=['Subgroup','Prob_true','Prob_pred'])
+
+results = []
+groups = test_results_df.groupby(['ethnicity','gender','age_binned'])
+
+for name, grp in groups:
+    sub_df = grp
+
+    prob_true, prob_pred = calibration_curve(sub_df['label'],sub_df['pred_proba'],n_bins=5,strategy='uniform')
+    results.append([str(name),prob_true, prob_pred])
+
+results_df = pd.DataFrame(results)
+results_df.to_excel('../results/ensemble_subgroup_test/ethnicity_gender_age_calibration.xlsx',
+                  header=['Subgroup','Prob_true','Prob_pred'])
 

@@ -72,8 +72,9 @@ def plot_pr_curve(y_true,y_pred,model_name,plot_title="Precision-recall curve"
 
 def plot_calibration_curve(y_true,y_pred,num_bins,model_name,plot_title='Calibration Plot',
                            filename=None):
-    prob_true, prob_pred = calibration_curve(y_true, y_pred,n_bins=num_bins)
+    prob_true, prob_pred = calibration_curve(y_true, y_pred,n_bins=num_bins,strategy='uniform')
     fig, ax = plt.subplots()
+    
     
     ax.plot(prob_pred,
             prob_true,
@@ -93,11 +94,35 @@ def plot_calibration_curve(y_true,y_pred,num_bins,model_name,plot_title='Calibra
         ylabel='True probability',
         title=str(plot_title))
     
-    ax.legend(loc="lower right")
+    ax.legend(loc="upper left")
     
     if filename != None:
         plt.savefig(filename)
-        
+      
+    plt.show()
+
+def plot_calibration_barplot(y_true,y_pred,num_bins,plot_title='7-day Readmission',
+                           filename=None):
+    prob_true, prob_pred = calibration_curve(y_true, y_pred,n_bins=num_bins,strategy='uniform')
+    fig, ax = plt.subplots()
+    
+    X_axis = np.arange(len(prob_pred))
+    X = X_axis + 1
+    ax.bar(X_axis - 0.2,prob_true*100,0.4,label = 'Observed')
+    ax.bar(X_axis + 0.2,prob_pred*100,0.4,label = 'Predicited')
+    
+    ax.set(
+        xticks=X_axis,
+        xticklabels = X,
+        xlabel='Bins of Predicted Risk Based on Model',
+        ylabel='Rate of 7-day Readmission (%)',
+        title=str(plot_title))
+    
+    ax.legend(loc="upper left")
+    
+    if filename != None:
+        plt.savefig(filename)
+      
     plt.show()
     
 def plot_calibration_by_subgroup(df,subgroup_cols,true_label,pred_label,num_bins,
@@ -131,9 +156,9 @@ def plot_calibration_by_subgroup(df,subgroup_cols,true_label,pred_label,num_bins
             ylabel='True probability',
             title=str(plot_title))  
     
-    ax.legend(loc="upper left")
+    ax.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
     
     if filename != None:
-        plt.savefig(filename)
+        plt.savefig(filename, bbox_inches='tight')
         
     plt.show()

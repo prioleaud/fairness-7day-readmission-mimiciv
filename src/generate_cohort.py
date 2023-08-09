@@ -305,11 +305,11 @@ X = df_transformed.drop(columns=['label'])
 # import train-test-split model
 from sklearn.model_selection import train_test_split
 
-X_train, X_test, y_train, y_test = train_test_split(X,y,test_size=0.25,
+X_train, X_test, y_train, y_test = train_test_split(X,y,test_size=0.2,
                                                     stratify=pd.concat([X[['ethnicity','gender','age_binned']], y],axis=1),
                                                     random_state=12)
 
-X_train, X_valid, y_train, y_valid = train_test_split(X_train,y_train,test_size=0.3,
+X_train, X_valid, y_train, y_valid = train_test_split(X_train,y_train,test_size=0.25,
                                                     stratify=pd.concat([X_train[['ethnicity','gender','age_binned']], y_train],axis=1),
                                                     random_state=12)
 
