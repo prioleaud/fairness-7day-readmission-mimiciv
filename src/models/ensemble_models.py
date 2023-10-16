@@ -5,7 +5,6 @@ Filename:       ensemble_models.py
 Description:    This script contains class object for ensemble model based on
                 social identities of patients and ensemble model using 
                 KMeans clusters
-Author:         Diandra Prioleau Ojo
 Date Created:   December 14, 2022
 """
 import numpy as np
