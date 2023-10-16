@@ -2,8 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 Filename:       save_results.py
-Description:    
-Author:         Diandra Prioleau Ojo
 Date Created:   February 7, 2022
 """
 import pandas as pd 
