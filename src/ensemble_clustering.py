@@ -5,7 +5,6 @@ Filename:       ensemble_clustering.py
 Description:    Fairness evaluation of ensemble model with partitions  
                 based on social identities for 7-day hospital readmission 
                 prediction with T2DM diabetes cohort from MIMIC-IV database 
-Author:         Diandra Prioleau Ojo
 Date Created:   March 1, 2023
 """
 
