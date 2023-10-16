@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sat Feb 25 23:24:48 2023
-
-@author: diandra
+Filename: data_partition.py
 """
 # import packages 
 import pandas as pd 
