@@ -3,7 +3,6 @@
 """
 Filename:       preliminary_study.py
 Description:    Create and save plots 
-Author:         Diandra Prioleau Ojo
 Date Created:   February 22, 2022
 """
 import numpy as np 
