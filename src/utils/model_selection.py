@@ -3,7 +3,6 @@
 """
 Filename:       model_selection.py
 Description:    Create and save plots 
-Author:         Diandra Prioleau Ojo
 Date Created:   February 25, 2022
 """
 # import packages
