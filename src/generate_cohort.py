@@ -2,8 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 Filename:       generate_cohort.py
-Description:    
-Author:         Diandra Prioleau Ojo
 Date Created:   February 15, 2022
 """
 
