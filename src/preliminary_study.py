@@ -4,7 +4,6 @@
 Filename:       preliminary_study.py
 Description:    Fairness evaluation of 7-day hospital readmission prediction 
                 with T2DM diabetes cohort from MIMIC-IV database 
-Author:         Diandra Prioleau Ojo
 Date Created:   February 15, 2023
 """
 
