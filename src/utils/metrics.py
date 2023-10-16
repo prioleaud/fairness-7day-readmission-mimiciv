@@ -5,7 +5,6 @@ Filename:       metrics.py
 Description:    This script includes performing a grid search CV to determine
                 the models of the ensemble model based on the best model 
                 (best AUC score) for each subset/bag of the ensemble 
-Author:         Diandra Prioleau Ojo
 Date Created:   November 15, 2022
 """
 
